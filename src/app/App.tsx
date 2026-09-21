@@ -5,6 +5,7 @@ import { useNutritionState } from "./hooks/useNutritionState";
 import type { MealPeriod } from "./services/storageService";
 
 import BarcodeScannerModal from "./components/BarcodeScannerModal";
+import OnboardingModal from "./components/OnboardingModal";
 import SettingsModal from "./components/SettingsModal";
 import VoiceInputModal from "./components/VoiceInputModal";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
@@ -28,6 +29,10 @@ export default function App() {
     setShowVoice,
     showSettings,
     setShowSettings,
+    showOnboarding,
+    setShowOnboarding,
+    handleCompleteOnboarding,
+    handleSkipOnboarding,
     reloadData,
     handlePrevDate,
     handleNextDate,
@@ -136,6 +141,16 @@ export default function App() {
             healthSettings={healthSettings}
             onUpdateHealthSettings={setHealthSettings}
             onDataReload={reloadData}
+            onOpenOnboarding={() => setShowOnboarding(true)}
+          />
+        )}
+
+        {showOnboarding && (
+          <OnboardingModal
+            initialTargets={targets}
+            initialHealthSettings={healthSettings}
+            onComplete={handleCompleteOnboarding}
+            onSkip={handleSkipOnboarding}
           />
         )}
       </div>

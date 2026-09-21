@@ -12,9 +12,11 @@ import {
   getEntriesForDate,
   getHealthSyncSettings,
   getTargets,
+  isOnboardingCompleted,
   saveEntry,
   saveHealthSyncSettings,
   saveTargets,
+  setOnboardingCompleted,
 } from "../services/storageService";
 import { syncToAppleHealth } from "../services/appleHealthService";
 
@@ -27,6 +29,7 @@ export function useNutritionState() {
   const [showScanner, setShowScanner] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => !isOnboardingCompleted());
 
   useEffect(() => {
     setEntries(getEntriesForDate(dateKey));
@@ -100,6 +103,30 @@ export function useNutritionState() {
     setHealthSettings(settings);
   };
 
+  const handleCompleteOnboarding = (initialTargets: Targets, syncHealth: boolean) => {
+    saveTargets(initialTargets);
+    setTargets(initialTargets);
+
+    const updatedHealth: HealthSyncSettings = {
+      ...healthSettings,
+      autoSync: syncHealth,
+    };
+    saveHealthSyncSettings(updatedHealth);
+    setHealthSettings(updatedHealth);
+
+    setOnboardingCompleted(true);
+    setShowOnboarding(false);
+
+    toast.success("Welcome to LogiCal!", {
+      description: `Daily targets set to ${initialTargets.calories} kcal. Ready to log meals!`,
+    });
+  };
+
+  const handleSkipOnboarding = () => {
+    setOnboardingCompleted(true);
+    setShowOnboarding(false);
+  };
+
   return {
     screen,
     setScreen,
@@ -114,6 +141,10 @@ export function useNutritionState() {
     setShowVoice,
     showSettings,
     setShowSettings,
+    showOnboarding,
+    setShowOnboarding,
+    handleCompleteOnboarding,
+    handleSkipOnboarding,
     reloadData,
     handlePrevDate: () => moveDate(-1),
     handleNextDate: () => moveDate(1),

@@ -49,6 +49,7 @@ const STORAGE_KEYS = {
   TARGETS: "logical_nutrition_targets",
   HEALTH_SYNC: "logical_health_sync_settings",
   FAVORITES: "logical_favorite_meals",
+  ONBOARDING_COMPLETED: "logical_onboarding_completed",
 };
 
 export const DEFAULT_TARGETS: Targets = {
@@ -294,11 +295,33 @@ export function saveHealthSyncSettings(settings: HealthSyncSettings): void {
   }
 }
 
+export function isOnboardingCompleted(): boolean {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
+    if (raw !== null) {
+      return raw === "true";
+    }
+    // Existing users who already have configured targets should not be blocked
+    return localStorage.getItem(STORAGE_KEYS.TARGETS) !== null;
+  } catch {
+    return true;
+  }
+}
+
+export function setOnboardingCompleted(completed: boolean): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, completed ? "true" : "false");
+  } catch (err) {
+    console.error("Failed to save onboarding completion status", err);
+  }
+}
+
 export function resetAllData(): void {
   localStorage.removeItem(STORAGE_KEYS.ENTRIES);
   localStorage.removeItem(STORAGE_KEYS.TARGETS);
   localStorage.removeItem(STORAGE_KEYS.HEALTH_SYNC);
   localStorage.removeItem(STORAGE_KEYS.FAVORITES);
+  localStorage.removeItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
 }
 
 export function loadDemoData(): void {

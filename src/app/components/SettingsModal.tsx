@@ -35,6 +35,7 @@ interface SettingsModalProps {
   healthSettings: HealthSyncSettings;
   onUpdateHealthSettings: (s: HealthSyncSettings) => void;
   onDataReload: () => void;
+  onOpenOnboarding?: () => void;
 }
 
 export default function SettingsModal({
@@ -45,6 +46,7 @@ export default function SettingsModal({
   healthSettings,
   onUpdateHealthSettings,
   onDataReload,
+  onOpenOnboarding,
 }: SettingsModalProps) {
   const [syncing, setSyncing] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState(false);
@@ -317,6 +319,22 @@ export default function SettingsModal({
           <div className="text-[10px] tracking-widest uppercase text-muted-foreground">
             Data Management
           </div>
+
+          {onOpenOnboarding && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenOnboarding();
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[12px] font-medium flex items-center justify-between transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-[#00D98A]" />
+                <span>Re-run Setup Wizard</span>
+              </div>
+              <ArrowRight size={14} className="text-muted-foreground" />
+            </button>
+          )}
 
           <button
             onClick={handleLoadDemo}

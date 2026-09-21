@@ -71,13 +71,17 @@ This file is an active handoff document for future agents and developers. Keep i
 - Added developer onboarding guide in `ONBOARDING.md`.
 - Completed Nutrition Label Scanner technical investigation & architecture blueprint in `OCR_INVESTIGATION.md` (Apple Vision on-device OCR + FDA regex parser).
 - Connected full JSON backup export & restore in `src/app/components/SettingsModal.tsx`.
+- Built local-first First-Time User Experience (FTUE / Onboarding) 3-step setup flow:
+  - Created `src/app/components/OnboardingModal.tsx`: Lifesum-inspired dark modal covering Goal & Weekly Rate, Macro Split & Lock, and Apple Health / Local-First Launch.
+  - Added storage persistence (`isOnboardingCompleted`, `setOnboardingCompleted`, `STORAGE_KEYS.ONBOARDING_COMPLETED`) in `src/app/services/storageService.ts` with backward compatibility for existing users.
+  - Added "Re-run Setup Wizard" button in `src/app/components/SettingsModal.tsx` allowing users to recalibrate targets anytime.
+  - Added unit test suite `src/app/services/onboarding.test.ts` verifying completion detection, persistence, and reset handling (35/35 tests passing).
 
 ## Still To Do
 
 - Verify camera/barcode scanner behavior on a physical iOS device (camera permissions and live video feed).
 - Verify native HealthKit permission prompt and sample writing on a physical iOS device.
 - Implement Nutrition Label Scanner UI and Swift Vision bridge according to `OCR_INVESTIGATION.md`.
-- Build optional In-App First-Time User Onboarding (FTE) 3-step setup flow.
 
 ## Known Blockers
 
