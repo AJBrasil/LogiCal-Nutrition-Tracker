@@ -11,6 +11,7 @@ import {
   Info,
   ArrowRight,
   ExternalLink,
+  Upload,
 } from "lucide-react";
 import {
   FoodEntry,
@@ -18,6 +19,8 @@ import {
   saveHealthSyncSettings,
   resetAllData,
   loadDemoData,
+  exportAllUserDataJSON,
+  importUserDataJSON,
   Targets,
 } from "../services/storageService";
 import { exportAppleHealthCSV, syncToAppleHealth } from "../services/appleHealthService";
@@ -96,6 +99,46 @@ export default function SettingsModal({
     toast.success("Demo Data Loaded", {
       description: "Populated 7 days of realistic nutrition history for analytics.",
     });
+  };
+
+  const handleExportJSON = () => {
+    const jsonStr = exportAllUserDataJSON();
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `LogiCal_Backup_${currentDateKey}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Backup Downloaded", {
+      description: "Full user logs and targets saved as JSON.",
+    });
+  };
+
+  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result;
+      if (typeof content === "string") {
+        const success = importUserDataJSON(content);
+        if (success) {
+          onDataReload();
+          toast.success("Data Restored", {
+            description: "Successfully imported your backup.",
+          });
+        } else {
+          toast.error("Import Failed", {
+            description: "The file was not a valid LogiCal backup.",
+          });
+        }
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   };
 
   const handleResetData = () => {
@@ -285,6 +328,31 @@ export default function SettingsModal({
             </div>
             <ArrowRight size={14} className="text-muted-foreground" />
           </button>
+
+          <button
+            onClick={handleExportJSON}
+            className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[12px] font-medium flex items-center justify-between transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Download size={14} className="text-[#4DA6FF]" />
+              <span>Export Full JSON Backup</span>
+            </div>
+            <ArrowRight size={14} className="text-muted-foreground" />
+          </button>
+
+          <label className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[12px] font-medium flex items-center justify-between transition-colors cursor-pointer">
+            <div className="flex items-center gap-2">
+              <Upload size={14} className="text-[#FFB84D]" />
+              <span>Restore Backup from JSON</span>
+            </div>
+            <ArrowRight size={14} className="text-muted-foreground" />
+            <input
+              type="file"
+              accept=".json,application/json"
+              onChange={handleImportJSON}
+              className="hidden"
+            />
+          </label>
 
           <button
             onClick={handleResetData}

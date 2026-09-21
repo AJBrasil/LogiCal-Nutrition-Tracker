@@ -53,55 +53,41 @@ This file is an active handoff document for future agents and developers. Keep i
 - Added cache tests to ensure verified barcode products are reused and fallback estimates are not cached.
 - Clarified barcode confidence states in the scanner preview with distinct labels, colors, and short verification notes.
 - Verified:
-  - `npm test` passes
-  - `npm run typecheck` passes
-  - production build succeeds when output is redirected to `/tmp/logical-nutrition-build`
-  - production build also succeeds with `vite build --configLoader runner --outDir /tmp/logical-nutrition-build`
+  - `npm test` passes (31/31 tests)
+  - `npm run typecheck` passes with zero errors
+  - production build succeeds with `npm run build` directly to `dist/`
+  - Capacitor iOS assets sync cleanly via `npx cap sync ios`
+- Built native Swift HealthKit Capacitor plugin in `ios/App/App/CapacitorHealthkit.swift` with `App.entitlements`:
+  - `requestAuthorization` for dietary calories, protein, carbohydrates, and fat
+  - `saveQuantitySample` with sample date anchoring
+  - `isAvailable` capability check
+- Added Quick Meal Favorites & Recents in `src/app/services/storageService.ts`:
+  - Curated default fitness favorites (Protein Shake, Chicken & Rice, Greek Yogurt with Berries, Sirloin Steak, Egg Whites)
+  - `getFavoriteMeals`, `saveFavoriteMeal`, `removeFavoriteMeal`, `isFavoriteMeal`, `getRecentMeals`
+  - Deduplication and preservation across JSON backup export and import
+- Added Quick Add favorites/recents shelf to `src/app/screens/DashboardScreen.tsx` for 1-tap logging pre-fill.
+- Added Star favorite toggle to `src/app/components/EntryModal.tsx` to favorite any logged meal on the fly.
+- Added unit tests for favorites and recents in `src/app/services/favoritesAndRecents.test.ts`.
+- Added developer onboarding guide in `ONBOARDING.md`.
+- Completed Nutrition Label Scanner technical investigation & architecture blueprint in `OCR_INVESTIGATION.md` (Apple Vision on-device OCR + FDA regex parser).
+- Connected full JSON backup export & restore in `src/app/components/SettingsModal.tsx`.
 
 ## Still To Do
 
-- Run a clean `npm install` after local filesystem permissions are fixed so `package-lock.json` can be fully regenerated and pruned.
-- Run normal `npm run build` after permissions are fixed so Vite can write its default temp config and clear/rebuild `dist/`.
-- Run `npm run cap:sync` after a successful normal build to refresh Capacitor iOS web assets.
-- Decide whether generated folders should remain tracked:
-  - `dist/`
-  - `ios/App/App/public/`
-- Consider extracting shared nutrition math/UI helpers from the screen files once more UI-level tests are in place.
-- Consider replacing `localStorage` with a more durable mobile persistence layer, such as Capacitor Preferences or SQLite.
-- Add UI-level tests for the core logging flow once the UI is split into smaller components.
-- Review Apple Health native plugin integration against the actual Capacitor plugin installed in the iOS project.
-- Verify camera/barcode scanner behavior on a real iOS device.
-- Clean up any unrelated Xcode-generated workspace files before committing, especially:
-  - `ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/`
+- Verify camera/barcode scanner behavior on a physical iOS device (camera permissions and live video feed).
+- Verify native HealthKit permission prompt and sample writing on a physical iOS device.
+- Implement Nutrition Label Scanner UI and Swift Vision bridge according to `OCR_INVESTIGATION.md`.
+- Build optional In-App First-Time User Onboarding (FTE) 3-step setup flow.
 
 ## Known Blockers
 
-- Some local files/directories have permission issues. During development, these blocked:
-  - updating `node_modules`
-  - rewriting `package-lock.json` through npm
-  - clearing `dist/assets` during a normal Vite build
-  - writing Vite temp config files under `node_modules/.vite-temp`
-  - using the default npm cache under `~/.npm`
-- Suggested local repair commands:
+- None currently. All builds, tests, type checks, and Capacitor sync succeed.
 
-```bash
-sudo chown -R "$USER":staff ~/.npm
-sudo chown -R "$USER":staff "/Users/ajbrasil/LogiCal Nutrition Tracker"
-chmod -R u+rwX "/Users/ajbrasil/LogiCal Nutrition Tracker"
-```
-
-Then rerun:
-
-```bash
-cd "/Users/ajbrasil/LogiCal Nutrition Tracker"
-npm install
-npm run build
-npm run cap:sync
-```
 
 ## Future Agent Notes
 
 - Treat this as an ongoing list. Update this file as part of every substantial development pass.
 - Preserve user changes and check `git status` before editing.
-- Prefer low-risk refactors that keep behavior stable, especially while splitting `App.tsx`.
+- Prefer low-risk refactors that keep behavior stable.
 - Keep tests focused on nutrition math, date handling, storage migration, barcode confidence, and Apple Health payload correctness.
+

@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { Star } from "lucide-react";
 
+import { isFavoriteMeal, saveFavoriteMeal } from "../services/storageService";
 import type { MealPeriod } from "../services/storageService";
 import type { ModalMacros } from "../types";
 
@@ -17,6 +19,7 @@ interface EntryModalProps {
 
 export default function EntryModal({ initialData, onClose, onLog }: EntryModalProps) {
   const [data, setData] = useState<ModalMacros>(initialData);
+  const [isFav, setIsFav] = useState<boolean>(() => isFavoriteMeal(initialData.name));
 
   const updateMacro = (key: keyof Omit<ModalMacros, "name" | "time" | "servingSize">, val: string) => {
     const n = parseInt(val, 10) || 0;
@@ -36,16 +39,36 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
 
         <div className="px-4 pt-2 pb-6">
           <div className="mb-4">
-            <div
-              className="text-[10px] tracking-widest uppercase text-muted-foreground mb-1"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
-              Food Item
+            <div className="flex items-center justify-between mb-1">
+              <span
+                className="text-[10px] tracking-widest uppercase text-muted-foreground"
+                style={{ fontFamily: "Inter, sans-serif" }}
+              >
+                Food Item
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsFav((prev) => !prev)}
+                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-colors border"
+                style={{
+                  background: isFav ? "rgba(255,184,77,0.15)" : "rgba(255,255,255,0.04)",
+                  borderColor: isFav ? "rgba(255,184,77,0.3)" : "rgba(255,255,255,0.08)",
+                  color: isFav ? "#FFB84D" : "#888899",
+                  fontFamily: "Inter, sans-serif",
+                }}
+              >
+                <Star size={11} fill={isFav ? "#FFB84D" : "none"} />
+                <span>{isFav ? "Favorited" : "Favorite"}</span>
+              </button>
             </div>
             <input
               type="text"
               value={data.name}
-              onChange={(e) => setData((prev) => ({ ...prev, name: e.target.value }))}
+              onChange={(e) => {
+                const newName = e.target.value;
+                setData((prev) => ({ ...prev, name: newName }));
+                setIsFav(isFavoriteMeal(newName));
+              }}
               className="w-full bg-[#252530] text-foreground text-[14px] font-medium px-3 py-2 rounded-xl outline-none border border-white/5"
               style={{ fontFamily: "Inter, sans-serif" }}
             />
@@ -147,7 +170,12 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
               Cancel
             </button>
             <button
-              onClick={() => onLog(data)}
+              onClick={() => {
+                if (isFav && data.name.trim()) {
+                  saveFavoriteMeal(data);
+                }
+                onLog(data);
+              }}
               className="flex-[2] py-3.5 rounded-xl text-[14px] font-medium transition-colors active:opacity-80"
               style={{ background: "#00D98A", color: "#0A0A0C", fontFamily: "Inter, sans-serif" }}
             >

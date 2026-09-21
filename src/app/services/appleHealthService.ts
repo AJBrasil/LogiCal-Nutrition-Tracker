@@ -29,11 +29,24 @@ export function healthSampleTimestamp(dateKey: string): string {
   return new Date(year, month - 1, day, 12, 0, 0).toISOString();
 }
 
-/**
- * Detect if running in native iOS Capacitor container
- */
 export function isNativeIOS(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+}
+
+/**
+ * Check if native HealthKit is available on the device
+ */
+export async function checkHealthKitAvailability(): Promise<boolean> {
+  if (!isNativeIOS()) return false;
+  try {
+    // @ts-expect-error - dynamic native bridge check
+    const healthPlugin = window.Capacitor?.Plugins?.CapacitorHealthkit || window.CapacitorHealthkit;
+    if (!healthPlugin) return false;
+    const res = await healthPlugin.isAvailable();
+    return Boolean(res?.available);
+  } catch {
+    return false;
+  }
 }
 
 /**

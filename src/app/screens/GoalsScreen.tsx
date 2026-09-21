@@ -6,10 +6,11 @@ import { toast } from "sonner";
 import TabBar from "../components/TabBar";
 import type { Screen } from "../types";
 import type { Phase, Targets } from "../services/storageService";
-
-function clamp(val: number, min: number, max: number) {
-  return Math.min(Math.max(val, min), max);
-}
+import {
+  calculateBalancedProtein,
+  calculateBasePhaseCalories,
+  calculateMacroCalories,
+} from "../utils/nutritionMath";
 
 export default function GoalsScreen({
   targets,
@@ -28,27 +29,20 @@ export default function GoalsScreen({
   const [proteinLocked, setProteinLocked] = useState(targets.proteinLocked);
   const [saved, setSaved] = useState(false);
 
-  const baseCalories = {
-    cut: Math.round(2800 - weeklyRate * 500),
-    recomp: 2800,
-    bulk: Math.round(2800 + weeklyRate * 250),
-  }[phase];
-
-  const totalMacroCals = protein * 4 + carbs * 4 + fat * 9;
+  const baseCalories = calculateBasePhaseCalories(phase, weeklyRate);
+  const totalMacroCals = calculateMacroCalories(protein, carbs, fat);
 
   const handleCarbChange = (val: number) => {
     setCarbs(val);
     if (!proteinLocked) {
-      const remaining = Math.round((baseCalories - val * 4 - fat * 9) / 4);
-      setProtein(clamp(remaining, 100, 350));
+      setProtein(calculateBalancedProtein(baseCalories, val, fat));
     }
   };
 
   const handleFatChange = (val: number) => {
     setFat(val);
     if (!proteinLocked) {
-      const remaining = Math.round((baseCalories - carbs * 4 - val * 9) / 4);
-      setProtein(clamp(remaining, 100, 350));
+      setProtein(calculateBalancedProtein(baseCalories, carbs, val));
     }
   };
 

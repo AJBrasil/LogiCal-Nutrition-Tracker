@@ -32,6 +32,10 @@ pnpm-debug.log*
 ios/App/DerivedData/
 ios/App/build/
 *.xcuserstate
+**/*.xcuserstate
 *.xcworkspace/xcuserdata/
+**/*.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
-*.xcodeproj/project.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcuserdata/
+**/xcshareddata/swiftpm/

@@ -7,6 +7,7 @@ import {
   Mic,
   Scan,
   Settings,
+  Star,
   Trash2,
 } from "lucide-react";
 
@@ -20,12 +21,11 @@ import {
   Targets,
   formatDisplayDate,
   getDailyTotals,
+  getFavoriteMeals,
+  getRecentMeals,
 } from "../services/storageService";
+import { calculateMacroTargetRatio } from "../utils/nutritionMath";
 import type { ModalMacros, Screen } from "../types";
-
-function clamp(val: number, min: number, max: number) {
-  return Math.min(Math.max(val, min), max);
-}
 
 function MacroBar({
   label,
@@ -38,7 +38,7 @@ function MacroBar({
   target: number;
   color: string;
 }) {
-  const pct = clamp((current / (target || 1)) * 100, 0, 100);
+  const pct = calculateMacroTargetRatio(current, target);
   return (
     <div className="flex-1 min-w-0">
       <div className="flex justify-between items-baseline mb-1">
@@ -209,7 +209,7 @@ export default function DashboardScreen({
 
   const totals = getDailyTotals(entries);
   const remaining = targets.calories - totals.calories;
-  const calPct = clamp((totals.calories / (targets.calories || 1)) * 100, 0, 100);
+  const calPct = calculateMacroTargetRatio(totals.calories, targets.calories);
 
   const displayDate = formatDisplayDate(dateKey);
 
@@ -235,6 +235,28 @@ export default function DashboardScreen({
     if (e.key === "Enter") {
       handleInputSubmit(inputVal);
     }
+  };
+
+  const favorites = getFavoriteMeals();
+  const recents = getRecentMeals(4);
+  const quickItems = [
+    ...favorites,
+    ...recents.filter((r) => !favorites.some((f) => f.name.toLowerCase() === r.name.toLowerCase())),
+  ].slice(0, 8);
+
+  const handleQuickSelect = (item: FoodEntry) => {
+    const h = new Date().getHours();
+    const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+    setModalData({
+      name: item.name,
+      calories: item.calories,
+      protein: item.protein,
+      carbs: item.carbs,
+      fat: item.fat,
+      time: period,
+      servingSize: item.servingSize,
+    });
+    setShowModal(true);
   };
 
   const morning = entries.filter((e) => e.time === "morning");
@@ -377,8 +399,36 @@ export default function DashboardScreen({
         <div className="h-4" />
       </div>
 
+      {/* Quick Add Favorites & Recents Shelf */}
+      {quickItems.length > 0 && (
+        <div className="px-4 pt-1 pb-1 shrink-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1" style={{ scrollbarWidth: "none" }}>
+            <span className="flex items-center gap-1 text-[9px] uppercase font-mono tracking-wider text-muted-foreground shrink-0 pr-1">
+              <Star size={10} className="text-[#FFB84D]" fill="#FFB84D" />
+              Quick:
+            </span>
+            {quickItems.map((item) => (
+              <button
+                key={`${item.name}-${item.id}`}
+                onClick={() => handleQuickSelect(item)}
+                className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-150 active:scale-95 border"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  borderColor: "rgba(255,255,255,0.08)",
+                  color: "#CCCCCC",
+                  fontFamily: "Inter, sans-serif",
+                }}
+              >
+                <span className="truncate max-w-[130px]">{item.name}</span>
+                <span className="font-mono text-[10px] text-[#00D98A]">{item.calories}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div
-        className="px-4 pt-2 pb-2 shrink-0"
+        className="px-4 pt-1 pb-2 shrink-0"
         style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
       >
         <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: "#1A1A22" }}>

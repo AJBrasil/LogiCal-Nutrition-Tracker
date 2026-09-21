@@ -48,6 +48,7 @@ const STORAGE_KEYS = {
   ENTRIES: "logical_entries_by_date",
   TARGETS: "logical_nutrition_targets",
   HEALTH_SYNC: "logical_health_sync_settings",
+  FAVORITES: "logical_favorite_meals",
 };
 
 export const DEFAULT_TARGETS: Targets = {
@@ -150,16 +151,21 @@ function normalizeStorageMap(value: unknown): Record<string, FoodEntry[]> {
   );
 }
 
+function getInitialDemoEntries(): Record<string, FoodEntry[]> {
+  return JSON.parse(JSON.stringify(INITIAL_DEMO_ENTRIES));
+}
+
 function getStorageMap(): Record<string, FoodEntry[]> {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.ENTRIES);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(INITIAL_DEMO_ENTRIES));
-      return INITIAL_DEMO_ENTRIES;
+      const initial = getInitialDemoEntries();
+      localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(initial));
+      return initial;
     }
     return normalizeStorageMap(JSON.parse(raw));
   } catch {
-    return INITIAL_DEMO_ENTRIES;
+    return getInitialDemoEntries();
   }
 }
 
@@ -179,10 +185,25 @@ export function getEntriesForDate(dateKey: string): FoodEntry[] {
 export function saveEntry(dateKey: string, entry: Omit<FoodEntry, "id">): FoodEntry {
   const map = getStorageMap();
   const current = map[dateKey] || [];
+
+  let newId = Date.now() + Math.floor(Math.random() * 10000);
+  while (current.some((e) => e.id === newId)) {
+    newId++;
+  }
+
   const newEntry: FoodEntry = {
-    ...entry,
-    id: Date.now() + Math.floor(Math.random() * 1000),
+    id: newId,
+    name: (typeof entry.name === "string" ? entry.name.trim() : "") || "Meal Entry",
+    calories: Math.max(0, Number(entry.calories) || 0),
+    protein: Math.max(0, Number(entry.protein) || 0),
+    carbs: Math.max(0, Number(entry.carbs) || 0),
+    fat: Math.max(0, Number(entry.fat) || 0),
+    time: entry.time,
+    servingSize: entry.servingSize,
+    barcode: entry.barcode,
+    syncedToHealth: entry.syncedToHealth,
   };
+
   map[dateKey] = [newEntry, ...current];
   setStorageMap(map);
   return newEntry;
@@ -277,6 +298,7 @@ export function resetAllData(): void {
   localStorage.removeItem(STORAGE_KEYS.ENTRIES);
   localStorage.removeItem(STORAGE_KEYS.TARGETS);
   localStorage.removeItem(STORAGE_KEYS.HEALTH_SYNC);
+  localStorage.removeItem(STORAGE_KEYS.FAVORITES);
 }
 
 export function loadDemoData(): void {
@@ -300,4 +322,147 @@ export function loadDemoData(): void {
   }
 
   setStorageMap(map);
+}
+
+export const DEFAULT_FAVORITE_MEALS: FoodEntry[] = [
+  { id: 101, name: "Whey Protein Shake", calories: 150, protein: 30, carbs: 3, fat: 2, time: "morning", servingSize: "1 scoop (35g)" },
+  { id: 102, name: "Grilled Chicken & Brown Rice", calories: 350, protein: 42, carbs: 34, fat: 5, time: "afternoon", servingSize: "6 oz chicken + 1 cup rice" },
+  { id: 103, name: "Greek Yogurt with Berries", calories: 210, protein: 20, carbs: 26, fat: 4, time: "morning", servingSize: "1 cup (170g)" },
+  { id: 104, name: "Sirloin Steak & Sweet Potato", calories: 550, protein: 50, carbs: 42, fat: 18, time: "evening", servingSize: "6 oz steak + 1 potato" },
+  { id: 105, name: "Egg Whites & Avocado Toast", calories: 320, protein: 24, carbs: 28, fat: 12, time: "morning", servingSize: "3 whites + 1 slice" },
+];
+
+export function getFavoriteMeals(): FoodEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.FAVORITES);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(DEFAULT_FAVORITE_MEALS));
+      return JSON.parse(JSON.stringify(DEFAULT_FAVORITE_MEALS));
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return JSON.parse(JSON.stringify(DEFAULT_FAVORITE_MEALS));
+    return parsed.map(normalizeEntry).filter((e): e is FoodEntry => e !== null);
+  } catch {
+    return JSON.parse(JSON.stringify(DEFAULT_FAVORITE_MEALS));
+  }
+}
+
+export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">): FoodEntry {
+  const favorites = getFavoriteMeals();
+  const cleanName = (typeof entry.name === "string" ? entry.name.trim() : "") || "Favorite Meal";
+
+  const filtered = favorites.filter((f) => f.name.toLowerCase() !== cleanName.toLowerCase());
+
+  const newFav: FoodEntry = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    name: cleanName,
+    calories: Math.max(0, Number(entry.calories) || 0),
+    protein: Math.max(0, Number(entry.protein) || 0),
+    carbs: Math.max(0, Number(entry.carbs) || 0),
+    fat: Math.max(0, Number(entry.fat) || 0),
+    time: entry.time,
+    servingSize: entry.servingSize,
+    barcode: entry.barcode,
+  };
+
+  const updated = [newFav, ...filtered];
+  try {
+    localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(updated));
+  } catch (err) {
+    console.error("Failed to save favorite meal", err);
+  }
+  return newFav;
+}
+
+export function removeFavoriteMeal(id: number): void {
+  const favorites = getFavoriteMeals();
+  const updated = favorites.filter((f) => f.id !== id);
+  try {
+    localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(updated));
+  } catch (err) {
+    console.error("Failed to remove favorite meal", err);
+  }
+}
+
+export function isFavoriteMeal(name: string): boolean {
+  if (!name) return false;
+  const favorites = getFavoriteMeals();
+  const target = name.trim().toLowerCase();
+  return favorites.some((f) => f.name.toLowerCase() === target);
+}
+
+export function getRecentMeals(limit: number = 8): FoodEntry[] {
+  const map = getStorageMap();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const seen = new Set<string>();
+  const recents: FoodEntry[] = [];
+
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateKey = formatDateKey(d);
+    const dayEntries = map[dateKey] || [];
+
+    for (const entry of dayEntries) {
+      const lower = entry.name.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        recents.push(entry);
+        if (recents.length >= limit) return recents;
+      }
+    }
+  }
+
+  return recents;
+}
+
+export interface UserDataBackup {
+  version: number;
+  exportedAt: string;
+  entries: Record<string, FoodEntry[]>;
+  targets: Targets;
+  healthSettings: HealthSyncSettings;
+  favorites?: FoodEntry[];
+}
+
+export function exportAllUserData(): UserDataBackup {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    entries: getStorageMap(),
+    targets: getTargets(),
+    healthSettings: getHealthSyncSettings(),
+    favorites: getFavoriteMeals(),
+  };
+}
+
+export function exportAllUserDataJSON(): string {
+  return JSON.stringify(exportAllUserData(), null, 2);
+}
+
+export function importUserDataJSON(jsonString: string): boolean {
+  try {
+    const data = JSON.parse(jsonString);
+    if (!data || typeof data !== "object") return false;
+
+    if (data.entries && typeof data.entries === "object" && !Array.isArray(data.entries)) {
+      setStorageMap(normalizeStorageMap(data.entries));
+    }
+    if (data.targets && typeof data.targets === "object") {
+      saveTargets({ ...DEFAULT_TARGETS, ...data.targets });
+    }
+    if (data.healthSettings && typeof data.healthSettings === "object") {
+      saveHealthSyncSettings({ ...DEFAULT_HEALTH_SYNC, ...data.healthSettings });
+    }
+    if (Array.isArray(data.favorites)) {
+      const valid = data.favorites.map(normalizeEntry).filter((e): e is FoodEntry => e !== null);
+      localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(valid));
+    }
+    return true;
+  } catch (err) {
+    console.error("Failed to import user data", err);
+    return false;
+  }
 }

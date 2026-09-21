@@ -4,18 +4,15 @@ import TabBar from "../components/TabBar";
 import { getAnalyticsData } from "../services/storageService";
 import type { Targets } from "../services/storageService";
 import type { Screen } from "../types";
-
-function clamp(val: number, min: number, max: number) {
-  return Math.min(Math.max(val, min), max);
-}
+import {
+  calculateAverage,
+  calculateFluctuation,
+  clamp,
+  isOnTarget,
+} from "../utils/nutritionMath";
 
 type TimeFrame = "7d" | "30d";
 type DataKey = "cals" | "protein" | "carbs" | "fat";
-
-function isOnTarget(val: number, target: number) {
-  if (val === 0 || !target) return false;
-  return Math.abs(val - target) / target <= 0.1;
-}
 
 export default function AnalyticsScreen({
   targets,
@@ -41,18 +38,15 @@ export default function AnalyticsScreen({
 
   const avg = (key: DataKey) => {
     const vals = activeDays.map((d) => d[key] as number);
-    return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    return calculateAverage(vals);
   };
 
   const metDays = (key: DataKey, target: number) =>
     activeDays.filter((d) => isOnTarget(d[key] as number, target)).length;
 
   const fluctuation = (key: DataKey) => {
-    const vals = activeDays.map((d) => d[key] as number).filter(Boolean);
-    if (!vals.length) return 0;
-    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const pctDiffs = vals.map((v) => Math.abs((v - mean) / mean) * 100);
-    return Math.round(pctDiffs.reduce((a, b) => a + b, 0) / pctDiffs.length);
+    const vals = activeDays.map((d) => d[key] as number);
+    return calculateFluctuation(vals);
   };
 
   const displayVal = (key: DataKey) =>
