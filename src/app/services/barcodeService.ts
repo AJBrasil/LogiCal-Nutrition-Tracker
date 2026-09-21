@@ -108,6 +108,8 @@ export const DEMO_BARCODES: DemoBarcode[] = [
   },
 ];
 
+const BARCODE_CACHE_KEY = "logical_barcode_product_cache";
+
 function numberOrZero(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -156,6 +158,79 @@ export function scaleBarcodeNutrition(product: ScannedProduct, multiplier: numbe
   };
 }
 
+function isConfidence(value: unknown): value is ScannedProduct["confidence"] {
+  return value === "high" || value === "medium" || value === "fallback";
+}
+
+function normalizeCachedProduct(value: unknown): ScannedProduct | null {
+  if (!value || typeof value !== "object") return null;
+  const product = value as Partial<ScannedProduct>;
+  if (
+    typeof product.barcode !== "string" ||
+    typeof product.name !== "string" ||
+    typeof product.servingSize !== "string" ||
+    !isConfidence(product.confidence)
+  ) {
+    return null;
+  }
+
+  return {
+    barcode: product.barcode,
+    name: product.name,
+    brand: typeof product.brand === "string" ? product.brand : undefined,
+    calories: numberOrZero(product.calories),
+    protein: numberOrZero(product.protein),
+    carbs: numberOrZero(product.carbs),
+    fat: numberOrZero(product.fat),
+    servingSize: product.servingSize,
+    servingWeightGrams: parseServingWeightGrams(product.servingWeightGrams),
+    imageUrl: typeof product.imageUrl === "string" ? product.imageUrl : undefined,
+    source: product.source === "openfoodfacts" ? "openfoodfacts" : "local_database",
+    confidence: product.confidence,
+  };
+}
+
+function getCachedBarcodeMap(): Record<string, ScannedProduct> {
+  if (typeof localStorage === "undefined") return {};
+
+  try {
+    const raw = localStorage.getItem(BARCODE_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
+    return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, ScannedProduct>>(
+      (acc, [barcode, product]) => {
+        const normalized = normalizeCachedProduct(product);
+        if (normalized) {
+          acc[barcode] = normalized;
+        }
+        return acc;
+      },
+      {}
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function getCachedBarcodeProduct(barcode: string): ScannedProduct | null {
+  const cleanCode = barcode.trim().replace(/[^0-9]/g, "");
+  return getCachedBarcodeMap()[cleanCode] ?? null;
+}
+
+export function cacheBarcodeProduct(product: ScannedProduct): void {
+  if (typeof localStorage === "undefined" || product.confidence === "fallback") return;
+
+  try {
+    const cache = getCachedBarcodeMap();
+    cache[product.barcode] = product;
+    localStorage.setItem(BARCODE_CACHE_KEY, JSON.stringify(cache));
+  } catch (err) {
+    console.warn("Failed to cache barcode product", err);
+  }
+}
+
 /**
  * Fetch product nutritional info by barcode using the Open Food Facts API
  * with instant fallback to demo data if offline or unavailable.
@@ -165,6 +240,10 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
 
   // Check local demo cache first
   const localMatch = DEMO_BARCODES.find((d) => d.barcode === cleanCode);
+  const cachedMatch = getCachedBarcodeProduct(cleanCode);
+  if (cachedMatch) {
+    return cachedMatch;
+  }
 
   try {
     const controller = new AbortController();
@@ -214,7 +293,7 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
         const brand = p.brands ? p.brands.split(",")[0].trim() : undefined;
         const imageUrl = p.image_front_url || p.image_small_url || localMatch?.imageUrl;
 
-        return {
+        const product: ScannedProduct = {
           barcode: cleanCode,
           name: brand ? `${brand} ${name}` : name,
           brand,
@@ -228,6 +307,8 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
           source: "openfoodfacts",
           confidence: hasServingMacros ? "high" : "medium",
         };
+        cacheBarcodeProduct(product);
+        return product;
       }
     }
   } catch (err) {
@@ -236,7 +317,7 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
 
   // Fallback to local match if found
   if (localMatch) {
-    return {
+    const product: ScannedProduct = {
       barcode: localMatch.barcode,
       name: `${localMatch.brand} ${localMatch.name}`,
       brand: localMatch.brand,
@@ -249,6 +330,8 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
       source: "local_database",
       confidence: "medium",
     };
+    cacheBarcodeProduct(product);
+    return product;
   }
 
   // Fallback if not found in API or local presets

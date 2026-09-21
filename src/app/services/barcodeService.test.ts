@@ -1,13 +1,41 @@
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  cacheBarcodeProduct,
   clampServingMultiplier,
+  getCachedBarcodeProduct,
   lookupBarcode,
   multiplierFromServingGrams,
   scaleBarcodeNutrition,
   type ScannedProduct,
 } from "./barcodeService.ts";
+
+class MemoryStorage {
+  private values = new Map<string, string>();
+
+  getItem(key: string) {
+    return this.values.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string) {
+    this.values.set(key, value);
+  }
+
+  clear() {
+    this.values.clear();
+  }
+}
+
+const storage = new MemoryStorage();
+Object.defineProperty(globalThis, "localStorage", {
+  value: storage,
+  configurable: true,
+});
+
+beforeEach(() => {
+  storage.clear();
+});
 
 function mockFetchProduct(product: unknown, status = 1) {
   globalThis.fetch = async () =>
@@ -143,4 +171,44 @@ test("converts grams into a serving multiplier when product weight exists", () =
   assert.equal(multiplierFromServingGrams(product, 60), 1.5);
   assert.equal(clampServingMultiplier(0), 0.05);
   assert.equal(clampServingMultiplier(30), 20);
+});
+
+test("caches verified barcode products for repeat scans", async () => {
+  cacheBarcodeProduct({
+    barcode: "1112223334445",
+    name: "Cached Yogurt",
+    calories: 120,
+    protein: 15,
+    carbs: 8,
+    fat: 3,
+    servingSize: "1 cup (170g)",
+    servingWeightGrams: 170,
+    source: "openfoodfacts",
+    confidence: "high",
+  });
+  globalThis.fetch = async () => {
+    throw new Error("fetch should not run for cached products");
+  };
+
+  const result = await lookupBarcode("1112223334445");
+
+  assert.equal(result.name, "Cached Yogurt");
+  assert.equal(result.calories, 120);
+  assert.equal(result.confidence, "high");
+});
+
+test("does not cache fallback barcode estimates", () => {
+  cacheBarcodeProduct({
+    barcode: "999",
+    name: "Fallback",
+    calories: 150,
+    protein: 10,
+    carbs: 15,
+    fat: 5,
+    servingSize: "1 serving",
+    source: "local_database",
+    confidence: "fallback",
+  });
+
+  assert.equal(getCachedBarcodeProduct("999"), null);
 });
