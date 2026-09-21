@@ -26,6 +26,30 @@ interface BarcodeScannerModalProps {
   }) => void;
 }
 
+function confidenceDetails(confidence: ScannedProduct["confidence"]) {
+  if (confidence === "high") {
+    return {
+      label: "Verified serving",
+      detail: "Serving nutrition was provided by the product database.",
+      className: "bg-[#00D98A]/10 border-[#00D98A]/25 text-[#00D98A]",
+    };
+  }
+
+  if (confidence === "medium") {
+    return {
+      label: "Database estimate",
+      detail: "Nutrition may be scaled from 100g data. Check the serving before logging.",
+      className: "bg-[#FFB84D]/10 border-[#FFB84D]/25 text-[#FFB84D]",
+    };
+  }
+
+  return {
+    label: "Fallback estimate",
+    detail: "No product match was found. Edit values after logging if needed.",
+    className: "bg-[#FF6B6B]/10 border-[#FF6B6B]/25 text-[#FF6B6B]",
+  };
+}
+
 export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -296,6 +320,7 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
           <div className="relative z-20 w-full max-w-sm rounded-2xl bg-[#141418] border border-white/15 p-4 shadow-2xl animate-in fade-in zoom-in duration-200">
             {(() => {
               const scaled = scaleBarcodeNutrition(product, multiplier);
+              const confidence = confidenceDetails(product.confidence);
 
               return (
                 <>
@@ -324,16 +349,15 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
                   UPC: {product.barcode} · {scaled.servingSize}
                 </div>
                 <div className="mt-1">
-                  <span className="text-[9px] uppercase tracking-wider rounded-md px-1.5 py-0.5 bg-white/5 border border-white/10 text-muted-foreground">
-                    {product.confidence === "high"
-                      ? "Verified serving"
-                      : product.confidence === "medium"
-                        ? "Database estimate"
-                        : "Fallback estimate"}
+                  <span className={`text-[9px] uppercase tracking-wider rounded-md px-1.5 py-0.5 border ${confidence.className}`}>
+                    {confidence.label}
                   </span>
                 </div>
               </div>
             </div>
+            <p className="text-[10px] text-muted-foreground leading-snug mb-3">
+              {confidence.detail}
+            </p>
 
             {/* Calories & Macros summary */}
             <div className="grid grid-cols-4 gap-2 bg-[#1A1A22] rounded-xl p-2.5 mb-3 text-center border border-white/5">

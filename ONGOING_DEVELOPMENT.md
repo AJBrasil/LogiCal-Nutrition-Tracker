@@ -51,6 +51,7 @@ This file is an active handoff document for future agents and developers. Keep i
 - Updated the barcode scanner preview so users can adjust scanned foods by serving count and, when available, grams before logging.
 - Added a local barcode product cache so previously resolved non-fallback products can be reused without another network lookup.
 - Added cache tests to ensure verified barcode products are reused and fallback estimates are not cached.
+- Clarified barcode confidence states in the scanner preview with distinct labels, colors, and short verification notes.
 - Verified:
   - `npm test` passes
   - `npm run typecheck` passes
@@ -67,8 +68,6 @@ This file is an active handoff document for future agents and developers. Keep i
   - `ios/App/App/public/`
 - Consider extracting shared nutrition math/UI helpers from the screen files once more UI-level tests are in place.
 - Consider replacing `localStorage` with a more durable mobile persistence layer, such as Capacitor Preferences or SQLite.
-- Strengthen barcode scanner UX and data quality:
-  - clearer fallback/medium/high confidence states
 - Add UI-level tests for the core logging flow once the UI is split into smaller components.
 - Review Apple Health native plugin integration against the actual Capacitor plugin installed in the iOS project.
 - Verify camera/barcode scanner behavior on a real iOS device.
