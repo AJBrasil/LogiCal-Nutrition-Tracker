@@ -297,12 +297,7 @@ export function saveHealthSyncSettings(settings: HealthSyncSettings): void {
 
 export function isOnboardingCompleted(): boolean {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
-    if (raw !== null) {
-      return raw === "true";
-    }
-    // Existing users who already have configured targets should not be blocked
-    return localStorage.getItem(STORAGE_KEYS.TARGETS) !== null;
+    return localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED) === "true";
   } catch {
     return true;
   }

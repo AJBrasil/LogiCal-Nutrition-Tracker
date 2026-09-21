@@ -35,16 +35,9 @@ Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
 });
 
-test("onboarding: returns false for a brand new user with no targets saved", () => {
+test("onboarding: returns false for a brand new user", () => {
   storage.clear();
   assert.equal(isOnboardingCompleted(), false);
-});
-
-test("onboarding: returns true for existing users with targets already in storage", () => {
-  storage.clear();
-  saveTargets({ ...DEFAULT_TARGETS, calories: 2500 });
-  // Even if logical_onboarding_completed is not explicitly set, existing targets treat user as onboarded
-  assert.equal(isOnboardingCompleted(), true);
 });
 
 test("onboarding: sets and reads explicit onboarding completion status", () => {
@@ -64,3 +57,4 @@ test("onboarding: resetAllData clears onboarding completion", () => {
   resetAllData();
   assert.equal(isOnboardingCompleted(), false);
 });
+
