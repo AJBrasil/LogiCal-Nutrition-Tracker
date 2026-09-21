@@ -10,6 +10,16 @@ export interface ScannedProduct {
   servingWeightGrams?: number;
   imageUrl?: string;
   source: "openfoodfacts" | "local_database";
+  confidence: "high" | "medium" | "fallback";
+}
+
+export interface ScaledBarcodeNutrition {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  servingSize: string;
+  servingWeightGrams?: number;
 }
 
 export interface DemoBarcode {
@@ -98,6 +108,54 @@ export const DEMO_BARCODES: DemoBarcode[] = [
   },
 ];
 
+function numberOrZero(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function parseServingWeightGrams(value: unknown): number | undefined {
+  const n = numberOrZero(value);
+  return n > 0 ? n : undefined;
+}
+
+function servingValue(nutriments: Record<string, unknown>, servingKey: string, hundredGramKey: string, baseKey: string, servingWeightGrams?: number): number {
+  const serving = numberOrZero(nutriments[servingKey]);
+  if (serving > 0) return serving;
+
+  const hundredGram = numberOrZero(nutriments[hundredGramKey]);
+  if (hundredGram > 0 && servingWeightGrams) {
+    return (hundredGram * servingWeightGrams) / 100;
+  }
+
+  return hundredGram || numberOrZero(nutriments[baseKey]);
+}
+
+export function clampServingMultiplier(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(Math.max(value, 0.05), 20);
+}
+
+export function multiplierFromServingGrams(product: ScannedProduct, grams: number): number {
+  if (!product.servingWeightGrams || product.servingWeightGrams <= 0) return 1;
+  return clampServingMultiplier(grams / product.servingWeightGrams);
+}
+
+export function scaleBarcodeNutrition(product: ScannedProduct, multiplier: number): ScaledBarcodeNutrition {
+  const safeMultiplier = clampServingMultiplier(multiplier);
+  const servingWeightGrams = product.servingWeightGrams
+    ? Math.round(product.servingWeightGrams * safeMultiplier)
+    : undefined;
+
+  return {
+    calories: Math.round(product.calories * safeMultiplier),
+    protein: Math.round(product.protein * safeMultiplier),
+    carbs: Math.round(product.carbs * safeMultiplier),
+    fat: Math.round(product.fat * safeMultiplier),
+    servingSize: safeMultiplier === 1 ? product.servingSize : `${safeMultiplier}x ${product.servingSize}`,
+    servingWeightGrams,
+  };
+}
+
 /**
  * Fetch product nutritional info by barcode using the Open Food Facts API
  * with instant fallback to demo data if offline or unavailable.
@@ -125,37 +183,32 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
       if (data.status === 1 && data.product) {
         const p = data.product;
         const n = p.nutriments || {};
+        const servingWeightGrams = parseServingWeightGrams(p.serving_quantity);
 
         // Calculate calories per serving or per 100g
         const calories = Math.round(
-          Number(n["energy-kcal_serving"]) ||
-          Number(n["energy-kcal_100g"]) ||
-          Number(n["energy-kcal"]) ||
-          (Number(n["energy_serving"]) ? Number(n["energy_serving"]) / 4.184 : 0) ||
-          0
+          servingValue(n, "energy-kcal_serving", "energy-kcal_100g", "energy-kcal", servingWeightGrams) ||
+          (numberOrZero(n["energy_serving"]) ? numberOrZero(n["energy_serving"]) / 4.184 : 0)
         );
 
         const protein = Math.round(
-          Number(n["proteins_serving"]) ||
-          Number(n["proteins_100g"]) ||
-          Number(n["proteins"]) ||
-          0
+          servingValue(n, "proteins_serving", "proteins_100g", "proteins", servingWeightGrams)
         );
 
         const carbs = Math.round(
-          Number(n["carbohydrates_serving"]) ||
-          Number(n["carbohydrates_100g"]) ||
-          Number(n["carbohydrates"]) ||
-          0
+          servingValue(n, "carbohydrates_serving", "carbohydrates_100g", "carbohydrates", servingWeightGrams)
         );
 
         const fat = Math.round(
-          Number(n["fat_serving"]) ||
-          Number(n["fat_100g"]) ||
-          Number(n["fat"]) ||
-          0
+          servingValue(n, "fat_serving", "fat_100g", "fat", servingWeightGrams)
         );
 
+        const hasServingMacros = Boolean(
+          n["energy-kcal_serving"] ||
+          n["proteins_serving"] ||
+          n["carbohydrates_serving"] ||
+          n["fat_serving"]
+        );
         const servingSize = p.serving_size || p.quantity || "1 serving";
         const name = p.product_name || p.generic_name || `Scanned Item #${cleanCode}`;
         const brand = p.brands ? p.brands.split(",")[0].trim() : undefined;
@@ -170,8 +223,10 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
           carbs,
           fat,
           servingSize,
+          servingWeightGrams,
           imageUrl,
           source: "openfoodfacts",
+          confidence: hasServingMacros ? "high" : "medium",
         };
       }
     }
@@ -192,6 +247,7 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
       servingSize: localMatch.servingSize,
       imageUrl: localMatch.imageUrl,
       source: "local_database",
+      confidence: "medium",
     };
   }
 
@@ -205,6 +261,7 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
     fat: 5,
     servingSize: "1 serving",
     source: "local_database",
+    confidence: "fallback",
   };
 }
 
@@ -234,4 +291,3 @@ export async function scanVideoFrameWithBarcodeDetector(video: HTMLVideoElement)
   }
   return null;
 }
-

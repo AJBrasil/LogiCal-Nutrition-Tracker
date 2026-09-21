@@ -107,6 +107,49 @@ const INITIAL_DEMO_ENTRIES: Record<string, FoodEntry[]> = {
 
 // ─── Storage Operations ───────────────────────────────────────────────────────
 
+function isMealPeriod(value: unknown): value is MealPeriod {
+  return value === "morning" || value === "afternoon" || value === "evening";
+}
+
+function normalizeEntry(value: unknown): FoodEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const entry = value as Partial<FoodEntry>;
+  if (
+    typeof entry.id !== "number" ||
+    typeof entry.name !== "string" ||
+    !isMealPeriod(entry.time)
+  ) {
+    return null;
+  }
+
+  return {
+    id: entry.id,
+    name: entry.name,
+    calories: Number(entry.calories) || 0,
+    protein: Number(entry.protein) || 0,
+    carbs: Number(entry.carbs) || 0,
+    fat: Number(entry.fat) || 0,
+    time: entry.time,
+    servingSize: typeof entry.servingSize === "string" ? entry.servingSize : undefined,
+    barcode: typeof entry.barcode === "string" ? entry.barcode : undefined,
+    syncedToHealth: typeof entry.syncedToHealth === "boolean" ? entry.syncedToHealth : undefined,
+  };
+}
+
+function normalizeStorageMap(value: unknown): Record<string, FoodEntry[]> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, FoodEntry[]>>(
+    (acc, [dateKey, entries]) => {
+      if (!Array.isArray(entries)) return acc;
+      acc[dateKey] = entries
+        .map(normalizeEntry)
+        .filter((entry): entry is FoodEntry => entry !== null);
+      return acc;
+    },
+    {}
+  );
+}
+
 function getStorageMap(): Record<string, FoodEntry[]> {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.ENTRIES);
@@ -114,7 +157,7 @@ function getStorageMap(): Record<string, FoodEntry[]> {
       localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(INITIAL_DEMO_ENTRIES));
       return INITIAL_DEMO_ENTRIES;
     }
-    return JSON.parse(raw);
+    return normalizeStorageMap(JSON.parse(raw));
   } catch {
     return INITIAL_DEMO_ENTRIES;
   }
@@ -258,4 +301,3 @@ export function loadDemoData(): void {
 
   setStorageMap(map);
 }
-

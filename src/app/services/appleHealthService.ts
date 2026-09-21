@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
-import { FoodEntry, getDailyTotals, HealthSyncSettings } from "./storageService";
+import { getDailyTotals } from "./storageService.ts";
+import type { FoodEntry, HealthSyncSettings } from "./storageService.ts";
 
 export interface HealthSyncResult {
   success: boolean;
@@ -21,6 +22,11 @@ export interface AppleHealthDataPayload {
   fat: number;
   appName: string;
   entriesCount: number;
+}
+
+export function healthSampleTimestamp(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0).toISOString();
 }
 
 /**
@@ -84,7 +90,7 @@ export async function syncToAppleHealth(
         });
 
         // Write quantity samples to HealthKit
-        const dateIso = new Date().toISOString();
+        const dateIso = healthSampleTimestamp(dateKey);
         if (settings.syncCalories && payload.calories > 0) {
           await healthPlugin.saveQuantitySample({
             sampleType: "calories",
@@ -189,4 +195,3 @@ export function exportAppleHealthCSV(entries: FoodEntry[], dateKey: string): voi
   link.click();
   document.body.removeChild(link);
 }
-

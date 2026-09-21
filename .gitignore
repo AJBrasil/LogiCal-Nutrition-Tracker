@@ -1,1 +1,37 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+.vite/
+
+# Capacitor generated web assets
+# Recreate with: npm run cap:sync
+/ios/App/App/public/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
+*.swp
+*.swo
+
+# Xcode generated files
+ios/App/DerivedData/
+ios/App/build/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/

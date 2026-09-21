@@ -4,6 +4,8 @@ import {
   DEMO_BARCODES,
   DemoBarcode,
   lookupBarcode,
+  multiplierFromServingGrams,
+  scaleBarcodeNutrition,
   ScannedProduct,
   scanVideoFrameWithBarcodeDetector,
 } from "../services/barcodeService";
@@ -34,6 +36,8 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState<ScannedProduct | null>(null);
   const [multiplier, setMultiplier] = useState(1);
+  const [servingInput, setServingInput] = useState("1");
+  const [gramsInput, setGramsInput] = useState("");
   const [mealPeriod, setMealPeriod] = useState<MealPeriod>(() => {
     const h = new Date().getHours();
     return h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
@@ -115,6 +119,8 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
       const p = await lookupBarcode(barcode);
       setProduct(p);
       setMultiplier(1);
+      setServingInput("1");
+      setGramsInput(p.servingWeightGrams ? String(Math.round(p.servingWeightGrams)) : "");
     } catch (err) {
       console.error("Barcode lookup failed", err);
     } finally {
@@ -154,17 +160,46 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
     }
   };
 
+  const updateMultiplier = (next: number) => {
+    const safeNext = Number.isFinite(next) ? Math.min(Math.max(next, 0.05), 20) : 1;
+    setMultiplier(safeNext);
+    setServingInput(String(safeNext));
+    if (product?.servingWeightGrams) {
+      setGramsInput(String(Math.round(product.servingWeightGrams * safeNext)));
+    }
+  };
+
+  const handleServingInputChange = (value: string) => {
+    setServingInput(value);
+    const parsed = parseFloat(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      updateMultiplier(parsed);
+    }
+  };
+
+  const handleGramsInputChange = (value: string) => {
+    setGramsInput(value);
+    if (!product) return;
+    const parsed = parseFloat(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      const nextMultiplier = multiplierFromServingGrams(product, parsed);
+      setMultiplier(nextMultiplier);
+      setServingInput(String(Number(nextMultiplier.toFixed(2))));
+    }
+  };
+
   const handleConfirmLog = () => {
     if (!product) return;
+    const scaled = scaleBarcodeNutrition(product, multiplier);
     triggerHaptic();
     onLogProduct({
       name: product.name,
-      calories: Math.round(product.calories * multiplier),
-      protein: Math.round(product.protein * multiplier),
-      carbs: Math.round(product.carbs * multiplier),
-      fat: Math.round(product.fat * multiplier),
+      calories: scaled.calories,
+      protein: scaled.protein,
+      carbs: scaled.carbs,
+      fat: scaled.fat,
       time: mealPeriod,
-      servingSize: multiplier === 1 ? product.servingSize : `${multiplier}x ${product.servingSize}`,
+      servingSize: scaled.servingSize,
       barcode: product.barcode,
     });
     onClose();
@@ -259,6 +294,11 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
         {/* Scanned product preview card */}
         {product && (
           <div className="relative z-20 w-full max-w-sm rounded-2xl bg-[#141418] border border-white/15 p-4 shadow-2xl animate-in fade-in zoom-in duration-200">
+            {(() => {
+              const scaled = scaleBarcodeNutrition(product, multiplier);
+
+              return (
+                <>
             <div className="flex gap-3 items-start mb-3">
               {product.imageUrl ? (
                 <img
@@ -281,7 +321,16 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
                   {product.name}
                 </div>
                 <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
-                  UPC: {product.barcode} · {product.servingSize}
+                  UPC: {product.barcode} · {scaled.servingSize}
+                </div>
+                <div className="mt-1">
+                  <span className="text-[9px] uppercase tracking-wider rounded-md px-1.5 py-0.5 bg-white/5 border border-white/10 text-muted-foreground">
+                    {product.confidence === "high"
+                      ? "Verified serving"
+                      : product.confidence === "medium"
+                        ? "Database estimate"
+                        : "Fallback estimate"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -291,40 +340,42 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Calories</div>
                 <div className="text-[16px] font-mono font-bold text-[#00D98A]">
-                  {Math.round(product.calories * multiplier)}
+                  {scaled.calories}
                 </div>
               </div>
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Protein</div>
                 <div className="text-[14px] font-mono font-semibold text-[#4DA6FF]">
-                  {Math.round(product.protein * multiplier)}g
+                  {scaled.protein}g
                 </div>
               </div>
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Carbs</div>
                 <div className="text-[14px] font-mono font-semibold text-[#FFB84D]">
-                  {Math.round(product.carbs * multiplier)}g
+                  {scaled.carbs}g
                 </div>
               </div>
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Fat</div>
                 <div className="text-[14px] font-mono font-semibold text-[#FF6B6B]">
-                  {Math.round(product.fat * multiplier)}g
+                  {scaled.fat}g
                 </div>
               </div>
             </div>
 
-            {/* Serving size multiplier */}
+            {/* Serving size adjustment */}
             <div className="mb-3">
               <div className="flex justify-between items-center mb-1 text-[11px] text-muted-foreground">
-                <span>Serving Multiplier</span>
-                <span className="font-mono text-white font-medium">{multiplier}x</span>
+                <span>Serving Amount</span>
+                <span className="font-mono text-white font-medium">
+                  {scaled.servingWeightGrams ? `${scaled.servingWeightGrams}g` : `${multiplier}x`}
+                </span>
               </div>
               <div className="flex gap-1.5">
                 {[0.5, 1, 1.5, 2].map((val) => (
                   <button
                     key={val}
-                    onClick={() => setMultiplier(val)}
+                    onClick={() => updateMultiplier(val)}
                     className={`flex-1 py-1 rounded-lg text-[11px] font-mono transition-colors ${
                       multiplier === val
                         ? "bg-[#00D98A] text-black font-semibold"
@@ -334,6 +385,33 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
                     {val}x
                   </button>
                 ))}
+              </div>
+              <div className={`grid gap-2 mt-2 ${product.servingWeightGrams ? "grid-cols-2" : "grid-cols-1"}`}>
+                <label className="rounded-lg bg-white/5 border border-white/10 px-2 py-1.5">
+                  <span className="block text-[9px] uppercase tracking-wider text-muted-foreground mb-0.5">Servings</span>
+                  <input
+                    type="number"
+                    min="0.05"
+                    max="20"
+                    step="0.05"
+                    value={servingInput}
+                    onChange={(e) => handleServingInputChange(e.target.value)}
+                    className="w-full bg-transparent text-white text-[13px] font-mono outline-none"
+                  />
+                </label>
+                {product.servingWeightGrams && (
+                  <label className="rounded-lg bg-white/5 border border-white/10 px-2 py-1.5">
+                    <span className="block text-[9px] uppercase tracking-wider text-muted-foreground mb-0.5">Grams</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={gramsInput}
+                      onChange={(e) => handleGramsInputChange(e.target.value)}
+                      className="w-full bg-transparent text-white text-[13px] font-mono outline-none"
+                    />
+                  </label>
+                )}
               </div>
             </div>
 
@@ -373,6 +451,9 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
                 Log to {mealPeriod}
               </button>
             </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
