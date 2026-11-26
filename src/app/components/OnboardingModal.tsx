@@ -94,7 +94,7 @@ export default function OnboardingModal({
       fat,
       proteinLocked,
     };
-    onComplete(configuredTargets, syncHealth);
+    onComplete(configuredTargets, false);
   };
 
   const phases: {
@@ -443,74 +443,8 @@ export default function OnboardingModal({
         )}
 
         {/* STEP 3: APPLE HEALTH & PRIVACY */}
-        {step === 3 && (
-          <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-200">
-            <div>
-              <div className="text-[11px] font-semibold text-[#00D98A] uppercase tracking-wider mb-1">
-                Step 3 of 3
-              </div>
-              <h2 className="text-[22px] font-bold text-white tracking-tight leading-tight">
-                Privacy-First Nutrition
-              </h2>
-              <p className="text-[13px] text-muted-foreground mt-1">
-                No accounts or cloud logins. Your data lives on your device and syncs to Apple Health.
-              </p>
-            </div>
-
-            {/* Core Values Cards */}
-            <div className="space-y-3">
-              <div className="p-3.5 rounded-2xl bg-[#141418] border border-white/10 flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#00D98A]/15 text-[#00D98A] flex items-center justify-center shrink-0 mt-0.5">
-                  <ShieldCheck size={20} />
-                </div>
-                <div>
-                  <div className="text-[14px] font-semibold text-white">100% Local & Private</div>
-                  <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
-                    Zero accounts, zero trackers, and zero external databases. All meals and targets are stored locally.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#141418] border border-white/10 flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#FF2D55]/15 text-[#FF2D55] flex items-center justify-center shrink-0 mt-0.5">
-                  <Heart size={20} />
-                </div>
-                <div>
-                  <div className="text-[14px] font-semibold text-white">Native Apple HealthKit</div>
-                  <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
-                    Writes dietary energy, protein, carbohydrates, and fat samples directly into the Apple Health app.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Apple Health Auto-Sync Toggle */}
-            <div className="p-4 rounded-2xl bg-gradient-to-b from-[#141418] to-[#111115] border border-white/15">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#FF2D55]/20 text-[#FF2D55] flex items-center justify-center">
-                    <Heart size={16} />
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-semibold text-white">Auto-Sync to Apple Health</div>
-                    <div className="text-[11px] text-muted-foreground">Syncs as soon as meals are logged</div>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={syncHealth}
-                  onChange={(e) => {
-                    triggerHaptic();
-                    setSyncHealth(e.target.checked);
-                  }}
-                  className="w-5 h-5 rounded accent-[#00D98A] cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        {step === 3 && <div className="space-y-4"><h2>Your home server</h2><p>Your Mac saves your meals and goals. Pending entries on this device are sent when you reconnect.</p><p>Export individual meals to Apple Health from Settings on your iPhone.</p></div>}
       </div>
-
       {/* Bottom CTA Action Bar */}
       <div className="p-5 shrink-0 border-t border-white/10 bg-[#0A0A0C]">
         {step === 1 && (

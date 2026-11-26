@@ -1,3 +1,6 @@
+import { change,syncLabel } from "../services/serverSync";
+import {formatDateKey,getEntriesForDate} from "../services/storageService";
+import {toast} from "sonner";
 import { useState } from "react";
 import {
   ChevronLeft,
@@ -68,9 +71,10 @@ function MacroBar({
 
 function EntryRow({
   entry,
-  onDelete,
+  onDelete, onEdit,
 }: {
   entry: FoodEntry;
+  onEdit:(entry:FoodEntry)=>void;
   onDelete: (id: number) => void;
 }) {
   const [swiped, setSwiped] = useState(false);
@@ -91,7 +95,7 @@ function EntryRow({
             className="text-[13px] text-foreground leading-tight truncate"
             style={{ fontFamily: "Inter, sans-serif" }}
           >
-            {entry.name}
+            <button onClick={e=>{e.stopPropagation();onEdit(entry);}}>{entry.name} · Edit</button>
           </div>
           <div
             className="text-[11px] text-muted-foreground mt-0.5 font-mono"
@@ -131,10 +135,11 @@ function EntryRow({
 function TimelineGroup({
   label,
   entries,
-  onDelete,
+  onDelete, onEdit,
 }: {
   label: string;
   entries: FoodEntry[];
+  onEdit:(entry:FoodEntry)=>void;
   onDelete: (id: number) => void;
 }) {
   const groupCals = entries.reduce((a, e) => a + (Number(e.calories) || 0), 0);
@@ -159,7 +164,7 @@ function TimelineGroup({
         {entries.map((entry, i) => (
           <div key={entry.id}>
             {i > 0 && <div className="h-px bg-border mx-4" />}
-            <EntryRow entry={entry} onDelete={onDelete} />
+            <EntryRow onEdit={onEdit} entry={entry} onDelete={onDelete} />
           </div>
         ))}
       </div>
@@ -205,7 +210,16 @@ export default function DashboardScreen({
     fat: 5,
     time: "morning",
   });
-  const [inputVal, setInputVal] = useState("");
+  const [inputVal, setInputVal] = useState(()=>localStorage.getItem("logical.draft") || "");
+  const [editing,setEditing]=useState<FoodEntry|null>(null);
+  const editEntry=(entry:FoodEntry)=>{setEditing(entry);setModalData(entry);setShowModal(true);};
+  const prior=new Date(dateKey+"T12:00:00"); prior.setDate(prior.getDate()-1);
+  const breakfast=getEntriesForDate(formatDateKey(prior)).filter(e=>e.time==="morning");
+  const copyBreakfast=()=>{
+    const added=breakfast.map((entry,i)=>({...entry,id:Date.now()*1000+i,createdAt:new Date(dateKey+'T08:00:00').toISOString(),syncedToHealth:false}));
+    change(added.map(e=>[`meal:${dateKey}:${e.id}`,e]));
+    toast("Breakfast copied",{action:{label:"Undo",onClick:()=>change(added.map(e=>[`meal:${dateKey}:${e.id}`,null]))}});
+  };
 
   const totals = getDailyTotals(entries);
   const remaining = targets.calories - totals.calories;
@@ -214,9 +228,9 @@ export default function DashboardScreen({
   const displayDate = formatDisplayDate(dateKey);
 
   const handleInputSubmit = (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim()) return; setEditing(null);
 
-    const parsed = parseFoodNaturalLanguage(text);
+    const parsed = parseFoodNaturalLanguage(text,getFavoriteMeals());
     const h = new Date().getHours();
     const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
 
@@ -245,6 +259,7 @@ export default function DashboardScreen({
   ].slice(0, 8);
 
   const handleQuickSelect = (item: FoodEntry) => {
+    setEditing(null);
     const h = new Date().getHours();
     const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
     setModalData({
@@ -254,7 +269,7 @@ export default function DashboardScreen({
       carbs: item.carbs,
       fat: item.fat,
       time: period,
-      servingSize: item.servingSize,
+      servingSize: item.servingSize, alias:item.alias,
     });
     setShowModal(true);
   };
@@ -391,15 +406,15 @@ export default function DashboardScreen({
           </div>
         ) : (
           <>
-            <TimelineGroup label="Morning" entries={morning} onDelete={onDeleteEntry} />
-            <TimelineGroup label="Afternoon" entries={afternoon} onDelete={onDeleteEntry} />
-            <TimelineGroup label="Evening" entries={evening} onDelete={onDeleteEntry} />
+            <TimelineGroup onEdit={editEntry} label="Morning" entries={morning} onDelete={onDeleteEntry} />
+            <TimelineGroup onEdit={editEntry} label="Afternoon" entries={afternoon} onDelete={onDeleteEntry} />
+            <TimelineGroup onEdit={editEntry} label="Evening" entries={evening} onDelete={onDeleteEntry} />
           </>
         )}
         <div className="h-4" />
       </div>
 
-      {/* Quick Add Favorites & Recents Shelf */}
+      <div className="flex justify-between items-center px-4 text-xs"><span aria-live="polite">{syncLabel()}</span>{breakfast.length>0 && <button onClick={copyBreakfast}>Copy yesterday’s breakfast</button>}</div>
       {quickItems.length > 0 && (
         <div className="px-4 pt-1 pb-1 shrink-0">
           <div className="flex items-center gap-1.5 overflow-x-auto py-1" style={{ scrollbarWidth: "none" }}>
@@ -408,8 +423,9 @@ export default function DashboardScreen({
               Quick:
             </span>
             {quickItems.map((item) => (
+              <div key={item.id} className="shrink-0 flex items-center gap-1">
+              <button aria-label={'Log '+item.name} onClick={()=>onLogEntry({...item,time:new Date().getHours()<12?'morning':new Date().getHours()<17?'afternoon':'evening'})}>Log {item.name}</button>
               <button
-                key={`${item.name}-${item.id}`}
                 onClick={() => handleQuickSelect(item)}
                 className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-150 active:scale-95 border"
                 style={{
@@ -419,9 +435,9 @@ export default function DashboardScreen({
                   fontFamily: "Inter, sans-serif",
                 }}
               >
-                <span className="truncate max-w-[130px]">{item.name}</span>
+                <span>Edit portion</span>
                 <span className="font-mono text-[10px] text-[#00D98A]">{item.calories}</span>
-              </button>
+              </button></div>
             ))}
           </div>
         </div>
@@ -434,7 +450,7 @@ export default function DashboardScreen({
         <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: "#1A1A22" }}>
           <input
             value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
+            onChange={(e) => {setInputVal(e.target.value);localStorage.setItem("logical.draft",e.target.value);}}
             onKeyDown={handleKeyDown}
             placeholder="Type '3 eggs and sourdough toast' or quick-add..."
             className="flex-1 bg-transparent text-foreground text-[13px] outline-none placeholder:text-muted-foreground min-w-0"
@@ -464,7 +480,9 @@ export default function DashboardScreen({
           initialData={modalData}
           onClose={() => setShowModal(false)}
           onLog={(item) => {
-            onLogEntry(item);
+            if(editing) change([[`meal:${dateKey}:${editing.id}`,{...editing,...item}]]);
+            else onLogEntry(item);
+            localStorage.removeItem("logical.draft");
             setShowModal(false);
             setInputVal("");
           }}

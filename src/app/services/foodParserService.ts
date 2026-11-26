@@ -88,7 +88,7 @@ function tryParseDirectMacros(input: string): ParsedFoodResult | null {
  * Parse natural language strings like:
  * "3 eggs and sourdough toast" or "chicken breast with rice"
  */
-export function parseFoodNaturalLanguage(input: string): ParsedFoodResult {
+export function parseFoodNaturalLanguage(input: string, favorites: {name:string;alias?:string;servingSize?:string;calories:number;protein:number;carbs:number;fat:number}[] = []): ParsedFoodResult {
   const trimmed = input.trim();
   if (!trimmed) {
     return {
@@ -107,7 +107,7 @@ export function parseFoodNaturalLanguage(input: string): ParsedFoodResult {
 
   // 2. Parse natural language phrases
   // Split by connectors: "and", "with", "+", "&", ","
-  const segments = trimmed
+  const segments = favorites.some(f=>[f.name,f.alias].some(n=>n?.toLowerCase()===trimmed.toLowerCase())) ? [trimmed] : trimmed
     .split(/\b(?:and|with|\+|&|,)\b/i)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -119,35 +119,30 @@ export function parseFoodNaturalLanguage(input: string): ParsedFoodResult {
   const matchedNames: string[] = [];
 
   for (const seg of segments) {
-    // Extract leading quantity number (e.g. "3 eggs" -> qty 3; "6oz" -> 1.5; etc.)
-    let qty = 1;
-    const numMatch = seg.match(/^(\d+(?:\.\d+)?)\s*(?:oz|cups?|tbsp|g)?/i);
-    if (numMatch) {
-      const parsedNum = parseFloat(numMatch[1]);
-      if (parsedNum > 0 && parsedNum <= 20) {
-        qty = parsedNum;
-      } else if (parsedNum > 20 && parsedNum <= 500) {
-        // likely grams or calories
-        qty = parsedNum / 100;
+    const amount = /^(\d+(?:\.\d+)?)(?:\s*(oz|g|cups?|tbsp)\b)?\s*/i.exec(seg);
+    const name = seg.slice(amount?.[0].length || 0).trim().toLowerCase();
+    const saved = favorites.find(f=>[f.name,f.alias].some(n=>n?.toLowerCase()===name));
+    const food = COMMON_FOODS.filter(f=>f.keywords.some(k=>name.includes(k))).sort((a,b)=>
+      Math.max(...b.keywords.filter(k=>name.includes(k)).map(k=>k.length))-Math.max(...a.keywords.filter(k=>name.includes(k)).map(k=>k.length)))[0];
+    const found = saved || food;
+    if(found) {
+      const serving=saved?.servingSize || food?.defaultServing || '';
+      let scale=amount ? Number(amount[1]) : 1;
+      if(amount?.[2]) {
+        const unit=amount[2].toLowerCase().replace(/cups?/, 'cup');
+        const refs=Array.from(serving.matchAll(/(\d+(?:\.\d+)?(?:\/\d+)?)\s*(oz|g|cups?|tbsp)\b/gi));
+        const ref=refs.find(m=>m[2].toLowerCase().replace(/cups?/,'cup')===unit) ||
+          refs.find(m=>['oz','g'].includes(unit) && ['g','oz'].includes(m[2]));
+        if(ref){const [n,d='1']=ref[1].split('/');scale/=Number(n)/Number(d);
+          if(unit==='g' && ref[2]==='oz') scale/=28.3495;
+          if(unit==='oz' && ref[2]==='g') scale*=28.3495;}
       }
+      totalCalories+=Math.round(scale*(saved?.calories ?? food.caloriesPerUnit));
+      totalProtein+=Math.round(scale*(saved?.protein ?? food.proteinPerUnit));
+      totalCarbs+=Math.round(scale*(saved?.carbs ?? food.carbsPerUnit));
+      totalFat+=Math.round(scale*(saved?.fat ?? food.fatPerUnit));
+      matchedNames.push(found.name);
     }
-
-    // Match against food database
-    let found = false;
-    const lowerSeg = seg.toLowerCase();
-
-    for (const food of COMMON_FOODS) {
-      if (food.keywords.some((kw) => lowerSeg.includes(kw))) {
-        totalCalories += Math.round(food.caloriesPerUnit * qty);
-        totalProtein += Math.round(food.proteinPerUnit * qty);
-        totalCarbs += Math.round(food.carbsPerUnit * qty);
-        totalFat += Math.round(food.fatPerUnit * qty);
-        matchedNames.push(food.name);
-        found = true;
-        break;
-      }
-    }
-
     if (!found) {
       // Default estimation for unknown segment
       totalCalories += 150;
@@ -162,7 +157,7 @@ export function parseFoodNaturalLanguage(input: string): ParsedFoodResult {
 
   return {
     name: displayName,
-    calories: Math.max(totalCalories, 50),
+    calories: totalCalories,
     protein: totalProtein,
     carbs: totalCarbs,
     fat: totalFat,

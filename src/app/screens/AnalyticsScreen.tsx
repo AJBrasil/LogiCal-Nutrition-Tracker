@@ -28,8 +28,8 @@ export default function AnalyticsScreen({
   const daysCount = timeFrame === "30d" ? 30 : 7;
   const data = getAnalyticsData(daysCount);
 
-  const maxCal = timeFrame === "30d" ? 3200 : 3000;
-  const targetLineY = (targets.calories / maxCal) * 100;
+  const maxCal = Math.max(3000,...data.map(d=>Math.max(d.cals,d.targets.calories)*1.05));
+
 
   const activeDays = data.filter((d) => d.logged);
   const missedCount = data.filter((d) => !d.logged).length;
@@ -42,7 +42,7 @@ export default function AnalyticsScreen({
   };
 
   const metDays = (key: DataKey, target: number) =>
-    activeDays.filter((d) => isOnTarget(d[key] as number, target)).length;
+    activeDays.filter((d) => isOnTarget(d[key] as number, d.targets[key==="cals"?"calories":key])).length;
 
   const fluctuation = (key: DataKey) => {
     const vals = activeDays.map((d) => d[key] as number);
@@ -133,21 +133,11 @@ export default function AnalyticsScreen({
 
           {/* Chart area with target line overlay */}
           <div className="relative" style={{ height: 96 }}>
-            {/* Target dashed line */}
-            <div
-              className="absolute left-0 right-0 pointer-events-none"
-              style={{
-                bottom: `${clamp(targetLineY, 5, 95)}%`,
-                borderTop: "1.5px dashed rgba(255,255,255,0.35)",
-                zIndex: 2,
-              }}
-            />
-
             {/* Bars */}
             <div className="absolute inset-0 flex items-end gap-1.5">
               {data.map((d, i) => {
                 const pct = d.logged ? clamp((d.cals / maxCal) * 100, 4, 100) : 4;
-                const onTarget = isOnTarget(d.cals, targets.calories);
+                const onTarget = isOnTarget(d.cals,d.targets.calories);
                 const overMiss = goalAlerts && d.logged && !onTarget;
                 const isSelected = selectedIdx === i;
 
@@ -157,7 +147,7 @@ export default function AnalyticsScreen({
                 } else if (isSelected) {
                   barBg = "#00D98A";
                 } else if (overMiss) {
-                  barBg = d.cals > targets.calories ? "#FF6B6B" : "#4DA6FF";
+                  barBg = d.cals > d.targets.calories ? "#FF6B6B" : "#4DA6FF";
                 } else if (onTarget) {
                   barBg = "rgba(0,217,138,0.75)";
                 } else {
@@ -169,14 +159,15 @@ export default function AnalyticsScreen({
                   <button
                     key={i}
                     onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
-                    className="flex-1 flex flex-col justify-end rounded-t-sm transition-all duration-200 focus:outline-none"
+                    className="relative flex-1 flex flex-col justify-end rounded-t-sm transition-all duration-200 focus:outline-none"
                     style={{
                       height: "100%",
                       cursor: "pointer",
                       WebkitTapHighlightColor: "transparent",
                     }}
-                    aria-label={`${d.day}: ${d.cals} kcal`}
+                    aria-label={`${d.day}: ${d.cals} kcal, target ${d.targets.calories}`}
                   >
+                    <span className="absolute left-0 right-0 border-t border-dashed border-white/35" style={{bottom:`${clamp(d.targets.calories/maxCal*100,0,100)}%`}}/>
                     <div
                       className="w-full rounded-t-sm transition-all duration-300"
                       style={{
@@ -215,7 +206,7 @@ export default function AnalyticsScreen({
               className="text-[9px] font-mono text-muted-foreground"
               style={{ fontFamily: "DM Mono, monospace" }}
             >
-              {targets.calories.toLocaleString()} target
+              {targets.calories.toLocaleString()} current target
             </span>
           </div>
 
@@ -268,7 +259,7 @@ export default function AnalyticsScreen({
             const val = displayVal(row.key);
             const met = metDays(row.key, row.target);
             const fluct = fluctuation(row.key);
-            const onTgt = isOnTarget(val, row.target);
+            const onTgt = isOnTarget(val, selectedDay?.targets[row.key==="cals"?"calories":row.key] ?? row.target);
             return (
               <div
                 key={row.label}

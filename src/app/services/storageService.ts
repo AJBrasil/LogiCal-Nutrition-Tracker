@@ -1,3 +1,5 @@
+import defaultFavorites from "./defaultFavorites.json" with { type: "json" };
+import { serverMode, records, change, healthExports } from "./serverSync.ts";
 export type MealPeriod = "morning" | "afternoon" | "evening";
 
 export interface FoodEntry {
@@ -10,6 +12,8 @@ export interface FoodEntry {
   time: MealPeriod;
   servingSize?: string;
   barcode?: string;
+  createdAt?: string;
+  alias?: string;
   syncedToHealth?: boolean;
 }
 
@@ -42,6 +46,7 @@ export interface DayAnalytics {
   carbs: number;
   fat: number;
   logged: boolean;
+  targets: Targets;
 }
 
 const STORAGE_KEYS = {
@@ -126,6 +131,7 @@ function normalizeEntry(value: unknown): FoodEntry | null {
 
   return {
     id: entry.id,
+    createdAt: entry.createdAt, alias: entry.alias,
     name: entry.name,
     calories: Number(entry.calories) || 0,
     protein: Number(entry.protein) || 0,
@@ -157,6 +163,14 @@ function getInitialDemoEntries(): Record<string, FoodEntry[]> {
 }
 
 function getStorageMap(): Record<string, FoodEntry[]> {
+  if (serverMode) {
+    const days: Record<string,FoodEntry[]> = {};
+    for (const [key,item] of Object.entries(records())) {
+      if (key.startsWith('meal:')) (days[key.split(':')[1]] ||= []).push(item);
+    }
+    for (const day of Object.values(days)) day.sort((a,b)=>(b.createdAt || "").localeCompare(a.createdAt || "") || b.id-a.id);
+    return days;
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.ENTRIES);
     if (!raw) {
@@ -187,7 +201,7 @@ export function saveEntry(dateKey: string, entry: Omit<FoodEntry, "id">): FoodEn
   const map = getStorageMap();
   const current = map[dateKey] || [];
 
-  let newId = Date.now() + Math.floor(Math.random() * 10000);
+  let newId = serverMode ? Math.floor(Math.random()*Number.MAX_SAFE_INTEGER) : Date.now() + Math.floor(Math.random() * 10000);
   while (current.some((e) => e.id === newId)) {
     newId++;
   }
@@ -205,6 +219,13 @@ export function saveEntry(dateKey: string, entry: Omit<FoodEntry, "id">): FoodEn
     syncedToHealth: entry.syncedToHealth,
   };
 
+  if (serverMode) {
+    const now = new Date();
+    newEntry.createdAt = new Date(dateKey+'T'+now.toTimeString().slice(0,8)).toISOString();
+    newEntry.alias = entry.alias;
+    change([[`meal:${dateKey}:${newId}`,newEntry]]);
+    return newEntry;
+  }
   map[dateKey] = [newEntry, ...current];
   setStorageMap(map);
   return newEntry;
@@ -214,6 +235,7 @@ export function deleteEntry(dateKey: string, id: number): FoodEntry | null {
   const map = getStorageMap();
   const current = map[dateKey] || [];
   const found = current.find((e) => e.id === id) || null;
+  if(serverMode) { change([[`meal:${dateKey}:${id}`,null]]); return found; }
   map[dateKey] = current.filter((e) => e.id !== id);
   setStorageMap(map);
   return found;
@@ -252,14 +274,19 @@ export function getAnalyticsData(daysCount: number = 7): DayAnalytics[] {
       protein: totals.protein,
       carbs: totals.carbs,
       fat: totals.fat,
-      logged: isLogged,
+      logged: isLogged, targets:getTargets(dateKey),
     });
   }
 
   return result;
 }
 
-export function getTargets(): Targets {
+export function getTargets(date = formatDateKey()): Targets {
+  if(serverMode) {
+    const all=records();
+    const key=Object.keys(all).filter(k=>k.startsWith('goal:') && k.slice(5)<=date).sort().pop();
+    return key ? all[key] : DEFAULT_TARGETS;
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TARGETS);
     if (!raw) return DEFAULT_TARGETS;
@@ -269,7 +296,8 @@ export function getTargets(): Targets {
   }
 }
 
-export function saveTargets(targets: Targets): void {
+export function saveTargets(targets: Targets,date=formatDateKey()): void {
+  if(serverMode) {change([["goal:"+date,targets]]);return;}
   try {
     localStorage.setItem(STORAGE_KEYS.TARGETS, JSON.stringify(targets));
   } catch (err) {
@@ -278,6 +306,7 @@ export function saveTargets(targets: Targets): void {
 }
 
 export function getHealthSyncSettings(): HealthSyncSettings {
+  if(serverMode) return records().settings || DEFAULT_HEALTH_SYNC;
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.HEALTH_SYNC);
     if (!raw) return DEFAULT_HEALTH_SYNC;
@@ -288,6 +317,7 @@ export function getHealthSyncSettings(): HealthSyncSettings {
 }
 
 export function saveHealthSyncSettings(settings: HealthSyncSettings): void {
+  if(serverMode) {change([["settings",settings]]);return;};
   try {
     localStorage.setItem(STORAGE_KEYS.HEALTH_SYNC, JSON.stringify(settings));
   } catch (err) {
@@ -296,6 +326,7 @@ export function saveHealthSyncSettings(settings: HealthSyncSettings): void {
 }
 
 export function isOnboardingCompleted(): boolean {
+  if(serverMode) return !!records().onboarded;
   try {
     return localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED) === "true";
   } catch {
@@ -304,6 +335,7 @@ export function isOnboardingCompleted(): boolean {
 }
 
 export function setOnboardingCompleted(completed: boolean): void {
+  if(serverMode) {change([["onboarded",completed]]);return;};
   try {
     localStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, completed ? "true" : "false");
   } catch (err) {
@@ -342,15 +374,10 @@ export function loadDemoData(): void {
   setStorageMap(map);
 }
 
-export const DEFAULT_FAVORITE_MEALS: FoodEntry[] = [
-  { id: 101, name: "Whey Protein Shake", calories: 150, protein: 30, carbs: 3, fat: 2, time: "morning", servingSize: "1 scoop (35g)" },
-  { id: 102, name: "Grilled Chicken & Brown Rice", calories: 350, protein: 42, carbs: 34, fat: 5, time: "afternoon", servingSize: "6 oz chicken + 1 cup rice" },
-  { id: 103, name: "Greek Yogurt with Berries", calories: 210, protein: 20, carbs: 26, fat: 4, time: "morning", servingSize: "1 cup (170g)" },
-  { id: 104, name: "Sirloin Steak & Sweet Potato", calories: 550, protein: 50, carbs: 42, fat: 18, time: "evening", servingSize: "6 oz steak + 1 potato" },
-  { id: 105, name: "Egg Whites & Avocado Toast", calories: 320, protein: 24, carbs: 28, fat: 12, time: "morning", servingSize: "3 whites + 1 slice" },
-];
+export const DEFAULT_FAVORITE_MEALS = defaultFavorites as FoodEntry[];
 
 export function getFavoriteMeals(): FoodEntry[] {
+  if(serverMode) return Object.entries(records()).filter(([k])=>k.startsWith('favorite:')).map(([,v])=>v);
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.FAVORITES);
     if (!raw) {
@@ -383,6 +410,11 @@ export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">): FoodEntry {
     barcode: entry.barcode,
   };
 
+  if(serverMode) {
+    const previous=favorites.find(f=>f.name.toLowerCase()===cleanName.toLowerCase());
+    newFav.id=previous?.id ?? newFav.id;newFav.alias=entry.alias;
+    change([["favorite:"+newFav.id,newFav]]);return newFav;
+  }
   const updated = [newFav, ...filtered];
   try {
     localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(updated));
@@ -393,6 +425,7 @@ export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">): FoodEntry {
 }
 
 export function removeFavoriteMeal(id: number): void {
+  if(serverMode) {change([["favorite:"+id,null]]);return;};
   const favorites = getFavoriteMeals();
   const updated = favorites.filter((f) => f.id !== id);
   try {
@@ -437,6 +470,8 @@ export function getRecentMeals(limit: number = 8): FoodEntry[] {
 }
 
 export interface UserDataBackup {
+  exportHistory?: Record<string,string>;
+  goalHistory?: Record<string,Targets>;
   version: number;
   exportedAt: string;
   entries: Record<string, FoodEntry[]>;
@@ -448,6 +483,8 @@ export interface UserDataBackup {
 export function exportAllUserData(): UserDataBackup {
   return {
     version: 1,
+    exportHistory: serverMode ? healthExports : undefined,
+    goalHistory: serverMode ? Object.fromEntries(Object.entries(records()).filter(([key])=>key.startsWith("goal:"))) : undefined,
     exportedAt: new Date().toISOString(),
     entries: getStorageMap(),
     targets: getTargets(),
@@ -465,6 +502,26 @@ export function importUserDataJSON(jsonString: string): boolean {
     const data = JSON.parse(jsonString);
     if (!data || typeof data !== "object") return false;
 
+    if(serverMode) {
+      if(data.version!==1 || !data.entries || typeof data.entries!=='object' || Array.isArray(data.entries)) return false;
+      const batch: [string,any][]=[];
+      for(const [date,items] of Object.entries(data.entries)) {
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Array.isArray(items)) return false;
+        for(const value of items){const item=normalizeEntry(value);if(!item || !item.name.trim() || [item.calories,item.protein,item.carbs,item.fat].some(v=>v<0 || !Number.isFinite(v)) || !Number.isSafeInteger(item.id) || item.id<0) return false; batch.push([`meal:${date}:${item.id}`,item]);}
+      }
+      for(const v of data.favorites || []) {const f=normalizeEntry(v);if(!f || !f.name.trim() || [f.calories,f.protein,f.carbs,f.fat].some(v=>v<0 || !Number.isFinite(v)) || !Number.isSafeInteger(f.id)||f.id<0) return false;batch.push(['favorite:'+f.id,f]);}
+      if(data.goalHistory && Object.keys(data.goalHistory).length) {
+        for(const [key,val] of Object.entries(data.goalHistory)){if(!/^goal:\d{4}-\d{2}-\d{2}$/.test(key)) return false;batch.push([key,val]);}
+      } else if(data.targets) batch.push(['goal:0001-01-01',data.targets]);
+      if(data.healthSettings) batch.push(['settings',data.healthSettings]);
+      for(const [meal,state] of Object.entries(data.exportHistory || {})){
+        if(!/^meal:\d{4}-\d{2}-\d{2}:\d+$/.test(meal)||!['pending','confirmed'].includes(String(state)))return false;
+        batch.push(['receipt:'+meal,state]);
+      }
+      for(const [key,goal] of batch) if(key.startsWith('goal:') &&
+        (!goal || ['calories','protein','fat','carbs'].some(k=>!Number.isFinite(goal[k]) || goal[k]<0)))return false;
+      batch.push(['onboarded',true]);change(batch);return true;
+    }
     if (data.entries && typeof data.entries === "object" && !Array.isArray(data.entries)) {
       setStorageMap(normalizeStorageMap(data.entries));
     }

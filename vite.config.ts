@@ -19,6 +19,7 @@ function figmaAssetResolver() {
 }
 
 export default defineConfig({
+  server: {proxy: {'/api': { target:'http://127.0.0.1:4317',changeOrigin:true,headers:{origin:'http://127.0.0.1:4317'} }}},
   plugins: [
     figmaAssetResolver(),
     // The React and Tailwind plugins are both required for Make, even if

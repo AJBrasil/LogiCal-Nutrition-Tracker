@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Star } from "lucide-react";
 
-import { isFavoriteMeal, saveFavoriteMeal } from "../services/storageService";
+import { isFavoriteMeal, saveFavoriteMeal, getFavoriteMeals, removeFavoriteMeal } from "../services/storageService";
 import type { MealPeriod } from "../services/storageService";
 import type { ModalMacros } from "../types";
 
@@ -19,10 +19,11 @@ interface EntryModalProps {
 
 export default function EntryModal({ initialData, onClose, onLog }: EntryModalProps) {
   const [data, setData] = useState<ModalMacros>(initialData);
+  const [portions,setPortions]=useState("1");
   const [isFav, setIsFav] = useState<boolean>(() => isFavoriteMeal(initialData.name));
 
-  const updateMacro = (key: keyof Omit<ModalMacros, "name" | "time" | "servingSize">, val: string) => {
-    const n = parseInt(val, 10) || 0;
+  const updateMacro = (key: "calories" | "protein" | "carbs" | "fat", val: string) => {
+    const n = Math.max(0,Number(val) || 0);
     setData((prev) => ({ ...prev, [key]: n }));
   };
 
@@ -114,6 +115,18 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
             </div>
           </div>
 
+          <label className="block mb-2">Servings <input aria-label="Servings" type="number" step="any" min="0.01" value={portions} onChange={e=>{
+            const value=e.target.value;setPortions(value);
+            const n=Number(value);if(n>0) setData(prev=>({...prev,
+              calories:Math.round(initialData.calories*n),protein:Math.round(initialData.protein*n*10)/10,
+              carbs:Math.round(initialData.carbs*n*10)/10,fat:Math.round(initialData.fat*n*10)/10,
+              servingSize:n===1?initialData.servingSize:(initialData.servingSize || '1 serving').replace(/^(\d+(?:\.\d+)?(?:\/\d+)?)/,q=>{
+                const [a,b='1']=q.split('/');return String(Math.round(Number(a)/Number(b)*n*100)/100);
+              })
+            }));
+          }}/></label>
+          <label>Reference portion <input placeholder="4 oz" value={data.servingSize || ''} onChange={e=>setData({...data,servingSize:e.target.value})}/></label>
+          {isFav && <label> Food alias <input placeholder="my usual chicken" value={data.alias || ''} onChange={e=>setData({...data,alias:e.target.value})}/></label>}
           <div className="h-px bg-border mb-4" />
 
           <div className="flex items-baseline justify-between mb-3">
@@ -170,16 +183,20 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
               Cancel
             </button>
             <button
+              disabled={!data.name.trim() || Number(portions)<=0}
               onClick={() => {
                 if (isFav && data.name.trim()) {
                   saveFavoriteMeal(data);
+                } else {
+                  const existing=getFavoriteMeals().find(f=>f.name.toLowerCase()===data.name.toLowerCase());
+                  if(existing)removeFavoriteMeal(existing.id);
                 }
                 onLog(data);
               }}
               className="flex-[2] py-3.5 rounded-xl text-[14px] font-medium transition-colors active:opacity-80"
               style={{ background: "#00D98A", color: "#0A0A0C", fontFamily: "Inter, sans-serif" }}
             >
-              Log to {PERIOD_LABELS.find((p) => p.key === data.time)?.label ?? data.time}
+              {("id" in initialData) ? "Save to" : "Log to"} {PERIOD_LABELS.find((p) => p.key === data.time)?.label ?? data.time}
             </button>
           </div>
         </div>

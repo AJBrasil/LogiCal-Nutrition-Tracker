@@ -31,3 +31,10 @@ test("uses fallback estimate for unknown foods", () => {
   assert.equal(result.confidence, "fallback_estimate");
   assert.equal(result.calories, 150);
 });
+
+test('scales named portions and saved aliases',()=>{
+  assert.equal(parseFoodNaturalLanguage('4 oz chicken').calories,185);
+  assert.equal(parseFoodNaturalLanguage('6 oz chicken').calories,278);
+  const foods=[{name:'Grilled chicken',alias:'my usual chicken',servingSize:'4 oz',calories:180,protein:32,carbs:0,fat:4}];
+  assert.equal(parseFoodNaturalLanguage('6 oz my usual chicken',foods).calories,270);
+});

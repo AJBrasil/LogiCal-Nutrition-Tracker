@@ -1,4 +1,4 @@
-import { Capacitor } from "@capacitor/core";
+
 import { getDailyTotals } from "./storageService.ts";
 import type { FoodEntry, HealthSyncSettings } from "./storageService.ts";
 
@@ -30,7 +30,8 @@ export function healthSampleTimestamp(dateKey: string): string {
 }
 
 export function isNativeIOS(): boolean {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  const bridge = (globalThis as {Capacitor?: {isNativePlatform(): boolean; getPlatform(): string}}).Capacitor;
+  return Boolean(bridge?.isNativePlatform() && bridge.getPlatform() === "ios");
 }
 
 /**

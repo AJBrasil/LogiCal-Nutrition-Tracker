@@ -4,9 +4,10 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "start": "node server/index.mjs",
     "build": "vite build",
     "dev": "vite",
-    "test": "node --test --experimental-strip-types --experimental-specifier-resolution=node \"src/app/**/*.test.ts\"",
+    "test": "node --test src/app/services/*.test.ts src/app/utils/*.test.ts server/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "cap:sync": "vite build && cap sync ios",
     "cap:open": "cap open ios"

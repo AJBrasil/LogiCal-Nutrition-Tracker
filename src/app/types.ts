@@ -8,6 +8,7 @@ export interface ModalMacros {
   protein: number;
   carbs: number;
   fat: number;
+  alias?: string;
   servingSize?: string;
   time: MealPeriod;
 }

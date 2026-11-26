@@ -6,7 +6,8 @@ import type { MealPeriod } from "./services/storageService";
 
 import BarcodeScannerModal from "./components/BarcodeScannerModal";
 import OnboardingModal from "./components/OnboardingModal";
-import SettingsModal from "./components/SettingsModal";
+import ServerSettings from "./components/ServerSettings";
+import {getFavoriteMeals} from "./services/storageService";
 import VoiceInputModal from "./components/VoiceInputModal";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
 import DashboardScreen from "./screens/DashboardScreen";
@@ -42,26 +43,11 @@ export default function App() {
   } = useNutritionState();
 
   return (
-    <div className="min-h-screen bg-[#070709] flex items-center justify-center p-0 sm:p-6 select-none">
+    <div className="min-h-screen bg-[#070709] flex items-center justify-center p-0 select-none">
       <Toaster position="top-center" richColors theme="dark" />
 
-      {/* Phone shell / Responsive mobile container */}
-      <div
-        className="relative overflow-hidden w-full h-full sm:w-[390px] sm:h-[844px] sm:rounded-[50px] bg-[#0A0A0C] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_40px_80px_rgba(0,0,0,0.7),0_0_0_8px_#111115,0_0_0_9px_rgba(255,255,255,0.06)]"
-      >
-        {/* Notch - only on desktop container frame */}
-        <div
-          className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 z-30"
-          style={{
-            width: 126,
-            height: 34,
-            background: "#0A0A0C",
-            borderRadius: "0 0 20px 20px",
-          }}
-        />
-
-        {/* Screen container */}
-        <div className="absolute inset-0 overflow-hidden sm:rounded-[50px]">
+      <div className="relative overflow-hidden w-full max-w-2xl h-[100dvh] bg-background text-foreground">
+        <div className="absolute inset-0 overflow-hidden">
           {screen === "dashboard" && (
             <DashboardScreen
               entries={entries}
@@ -117,7 +103,7 @@ export default function App() {
           <VoiceInputModal
             onClose={() => setShowVoice(false)}
             onVoiceResult={(transcript) => {
-              const parsed = parseFoodNaturalLanguage(transcript);
+              const parsed = parseFoodNaturalLanguage(transcript,getFavoriteMeals());
               const h = new Date().getHours();
               const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
               handleLogEntry({
@@ -133,16 +119,7 @@ export default function App() {
         )}
 
         {showSettings && (
-          <SettingsModal
-            onClose={() => setShowSettings(false)}
-            entries={entries}
-            currentDateKey={dateKey}
-            targets={targets}
-            healthSettings={healthSettings}
-            onUpdateHealthSettings={setHealthSettings}
-            onDataReload={reloadData}
-            onOpenOnboarding={() => setShowOnboarding(true)}
-          />
+          <ServerSettings date={dateKey} entries={entries} close={()=>setShowSettings(false)} setup={()=>{setShowSettings(false);setShowOnboarding(true);}} />
         )}
 
         {showOnboarding && (

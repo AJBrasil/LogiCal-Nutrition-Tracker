@@ -1,0 +1,113 @@
+import http from "node:http";
+import { mkdirSync, existsSync, createReadStream, statSync } from "node:fs";
+import { resolve, dirname, extname, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { openStore } from "./store.mjs";
+
+const root = fileURLToPath(new URL("../dist/", import.meta.url));
+const path =
+  process.env.LOGICAL_DB ||
+  resolve(homedir(), "Library/Application Support/LogiCal/nutrition.sqlite");
+mkdirSync(dirname(path), { recursive: true });
+const store = openStore(path);
+const types = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
+};
+const port = Number(process.env.PORT || 4317);
+http
+  .createServer(async (req, res) => {
+    function json(status, value) {
+      res.writeHead(status, {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+      });
+      res.end(JSON.stringify(value));
+    }
+    try {
+      const url = new URL(req.url, "http://localhost");
+      const validHost = [
+        `localhost:${port}`,
+        `127.0.0.1:${port}`,
+        process.env.LOGICAL_HOST,
+      ].filter(Boolean);
+      if (!validHost.includes(req.headers.host) && !process.env.LOGICAL_OWNER)
+        return json(403, { error: "Use the configured host" });
+      if (
+        process.env.LOGICAL_OWNER &&
+        req.headers["tailscale-user-login"] !== process.env.LOGICAL_OWNER
+      )
+        return json(403, { error: "Use your authorized Tailscale identity" });
+      if (url.pathname.startsWith("/api/")) {
+        if (req.method === "GET" && url.pathname === "/api/state")
+          return json(200, { records: store.read(), exports: store.status() });
+        if (
+          req.method !== "POST" ||
+          req.headers["content-type"]?.split(";")[0] !== "application/json"
+        )
+          return json(415, { error: "JSON required" });
+        if (
+          req.headers.origin &&
+          new URL(req.headers.origin).host !== req.headers.host &&
+          new URL(req.headers.origin).host !== process.env.LOGICAL_HOST
+        )
+          return json(403, { error: "Origin mismatch" });
+        const chunks = [];
+        let bytes = 0;
+        for await (const chunk of req) {
+          bytes += chunk.length;
+          if (bytes > 16 * 1024 * 1024)
+            return json(413, { error: "Request too large" });
+          chunks.push(chunk);
+        }
+        const body = JSON.parse(Buffer.concat(chunks).toString());
+        switch (url.pathname) {
+          case "/api/sync":
+            store.apply(body);
+            return json(200, {
+              records: store.read(),
+              exports: store.status(),
+            });
+          case "/api/export":
+            return json(200, store.reserve(body.meal, body.date));
+          case "/api/confirm":
+            store.confirm(body.ticket);
+            break;
+          case "/api/reconcile":
+            store.reconcile(body.meal, body.written === true);
+            break;
+          default:
+            return json(404, { error: "Unknown endpoint" });
+        }
+        return json(200, { ok: true });
+      }
+      const file = resolve(
+        root,
+        "." +
+          decodeURIComponent(
+            url.pathname === "/" ? "/index.html" : url.pathname,
+          ),
+      );
+      if (
+        req.method !== "GET" ||
+        !file.startsWith(resolve(root) + sep) ||
+        !existsSync(file) ||
+        !statSync(file).isFile()
+      )
+        return json(404, { error: "Missing file" });
+      res.writeHead(200, {
+        "Content-Type": types[extname(file)] || "application/octet-stream",
+      });
+      createReadStream(file).pipe(res);
+    } catch (error) {
+      json(400, { error: String(error.message) });
+    }
+  })
+  .listen(port, "127.0.0.1", () =>
+    console.log("LogiCal listening on localhost port", port),
+  );

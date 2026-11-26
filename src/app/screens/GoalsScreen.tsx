@@ -1,3 +1,4 @@
+import {formatDateKey} from "../services/storageService";
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -18,7 +19,7 @@ export default function GoalsScreen({
   onTabChange,
 }: {
   targets: Targets;
-  onSaveTargets: (t: Targets) => void;
+  onSaveTargets: (t: Targets,date?:string) => void;
   onTabChange: (s: Screen) => void;
 }) {
   const [phase, setPhase] = useState<Phase>(targets.phase);
@@ -29,7 +30,9 @@ export default function GoalsScreen({
   const [proteinLocked, setProteinLocked] = useState(targets.proteinLocked);
   const [saved, setSaved] = useState(false);
 
-  const baseCalories = calculateBasePhaseCalories(phase, weeklyRate);
+  const [manual,setManual]=useState<string>(String(targets.calories));
+  const [effective,setEffective]=useState(formatDateKey());
+  const baseCalories=Number(manual)>0?Number(manual):calculateBasePhaseCalories(phase,weeklyRate);
   const totalMacroCals = calculateMacroCalories(protein, carbs, fat);
 
   const handleCarbChange = (val: number) => {
@@ -61,7 +64,7 @@ export default function GoalsScreen({
       fat,
       proteinLocked,
     };
-    onSaveTargets(updated);
+    onSaveTargets(updated,effective);
     setSaved(true);
     toast.success("Fitness Targets Updated", {
       description: `Daily calorie goal set to ${baseCalories} kcal (${protein}P · ${carbs}C · ${fat}F)`,
@@ -88,7 +91,7 @@ export default function GoalsScreen({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4" style={{ scrollbarWidth: "none" }}>
-        {/* Phase toggle */}
+        <div className="flex flex-wrap gap-3 mb-4"><label>Daily kcal <input type="number" min="1" placeholder="Use phase target" value={manual} onChange={e=>setManual(e.target.value)}/></label><label>Effective from <input type="date" value={effective} onChange={e=>{if(e.target.value)setEffective(e.target.value)}}/></label></div>
         <div
           className="rounded-xl overflow-hidden mb-6"
           style={{
@@ -101,7 +104,7 @@ export default function GoalsScreen({
             {phaseLabels.map(({ key, label, sub }) => (
               <button
                 key={key}
-                onClick={() => setPhase(key)}
+                onClick={() => {setPhase(key);setManual("");}}
                 className="py-2.5 rounded-lg transition-all duration-200 flex flex-col items-center"
                 style={{
                   background: phase === key ? "#00D98A" : "transparent",
@@ -149,7 +152,7 @@ export default function GoalsScreen({
             max={2}
             step={0.25}
             value={weeklyRate}
-            onChange={(e) => setWeeklyRate(parseFloat(e.target.value))}
+            onChange={(e) => (setWeeklyRate(parseFloat(e.target.value)),setManual(""))}
             className="w-full mb-4 cursor-pointer"
             style={{ accentColor: "#00D98A" }}
           />

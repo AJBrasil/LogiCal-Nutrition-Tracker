@@ -1,3 +1,4 @@
+import {change} from "../services/serverSync";
 import { useEffect, useState } from "react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { toast } from "sonner";
@@ -32,7 +33,9 @@ export function useNutritionState() {
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => !isOnboardingCompleted());
 
   useEffect(() => {
-    setEntries(getEntriesForDate(dateKey));
+    const update=()=>{setEntries(getEntriesForDate(dateKey));setTargets(getTargets(dateKey));setHealthSettings(getHealthSyncSettings());};
+    update();window.addEventListener('logical-state',update);
+    return ()=>window.removeEventListener('logical-state',update);
   }, [dateKey]);
 
   const reloadData = () => {
@@ -58,7 +61,7 @@ export function useNutritionState() {
       action: {
         label: "Undo",
         onClick: () => {
-          saveEntry(dateKey, deleted);
+          change([[`meal:${dateKey}:${deleted.id}`,deleted]]);
           setEntries(getEntriesForDate(dateKey));
         },
       },
@@ -66,14 +69,14 @@ export function useNutritionState() {
   };
 
   const handleLogEntry = (item: ModalMacros) => {
-    saveEntry(dateKey, {
+    const saved=saveEntry(dateKey, {
       name: item.name,
       calories: item.calories,
       protein: item.protein,
       carbs: item.carbs,
       fat: item.fat,
       time: item.time,
-      servingSize: item.servingSize,
+      servingSize: item.servingSize, alias:item.alias,
     });
     setEntries(getEntriesForDate(dateKey));
 
@@ -84,18 +87,16 @@ export function useNutritionState() {
     }
 
     toast.success("Meal Logged", {
+      action:{label:"Undo",onClick:()=>{deleteEntry(dateKey,saved.id);}},
       description: `${item.name} (${item.calories} kcal)`,
     });
 
-    if (healthSettings.autoSync) {
-      const currentEntries = getEntriesForDate(dateKey);
-      syncToAppleHealth(currentEntries, dateKey, healthSettings);
-    }
+
   };
 
-  const handleSaveTargets = (newTargets: Targets) => {
-    saveTargets(newTargets);
-    setTargets(newTargets);
+  const handleSaveTargets = (newTargets: Targets, effectiveDate=dateKey) => {
+    saveTargets(newTargets,effectiveDate);
+    setTargets(getTargets(dateKey));
   };
 
   const handleUpdateHealthSettings = (settings: HealthSyncSettings) => {
