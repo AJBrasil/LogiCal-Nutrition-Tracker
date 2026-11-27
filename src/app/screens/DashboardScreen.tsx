@@ -213,7 +213,7 @@ export default function DashboardScreen({
     time: "morning",
   });
   const [inputVal, setInputVal] = useState(()=>localStorage.getItem("logical.draft") || "");
-  type SearchMatch = Omit<ModalMacros, "time"> & {source:string};
+  type SearchMatch = Omit<ModalMacros, "time"> & {source:string;needsLabel?:boolean};
   const [preview, setPreview] = useState<{query:string; matches:SearchMatch[]; failed:boolean} | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
   const [products, setProducts] = useState<{query:string; matches:SearchMatch[]; loading:boolean; message:string} | null>(null);
@@ -291,6 +291,28 @@ export default function DashboardScreen({
         message:data.length ? "Open Food Facts products" : "No products with complete calorie and macro data found."});
     } catch (error) {
       if (!controller.signal.aborted) setProducts({query,matches:[],loading:false,message:error.message || "Product search failed."});
+    }
+  }
+
+  async function openSearchResult(match:SearchMatch) {
+    const {source,needsLabel,...food} = match;
+    if (!needsLabel) return handleQuickSelect(food);
+    activeSearch.current?.abort();
+    const controller = new AbortController();
+    activeSearch.current = controller;
+    setProducts(prev => prev && {...prev,message:"Loading nutrition label…"});
+    try {
+      const response = await fetch("/api/foods/label?code="+encodeURIComponent(food.barcode),{signal:controller.signal});
+      if (!response.ok) throw Error();
+      const {source:labelSource,...label} = await response.json();
+      if (!controller.signal.aborted) handleQuickSelect(label);
+    } catch {
+      if (controller.signal.aborted) return;
+      handleQuickSelect({...food,calories:0,protein:0,carbs:0,fat:0});
+      setManualEntry(true);
+      toast("Nutrition label unavailable. Enter values from the package to log this food.");
+    } finally {
+      if (!controller.signal.aborted) setProducts(prev => prev && {...prev,message:"Open Food Facts products"});
     }
   }
 
@@ -521,8 +543,8 @@ export default function DashboardScreen({
         {query && !showModal && <div className="food-results" aria-label="Food search results">
           <button type="button" disabled={products?.loading} onClick={searchOpenFoods}>Search Open Food Facts</button>
           {products?.query === query && <><p role="status">{products.message}</p>
-            {products.matches.map(({source, ...food}) => <button type="button" key={food.barcode} onClick={()=>handleQuickSelect(food)}>
-              <span><strong>{food.name}</strong><small>{source} · {food.servingSize}</small></span><span>{food.calories} kcal</span>
+            {products.matches.map((food) => <button type="button" key={food.barcode} onClick={()=>openSearchResult(food)}>
+              <span><strong>{food.name}</strong><small>{food.source} · {food.servingSize || "Packaged product"}</small></span><span>{food.needsLabel ? "View label" : food.calories+" kcal"}</span>
             </button>)}
             {products.matches.length > 0 && <a href="https://openfoodfacts.org" target="_blank" rel="noreferrer" className="px-3 underline text-xs">Data from Open Food Facts (ODbL)</a>}
           </>}

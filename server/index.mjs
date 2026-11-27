@@ -1,4 +1,4 @@
-import {createProductSearch} from "./openFoodFacts.mjs";
+import {createProductSearch, labelFood} from "./openFoodFacts.mjs";
 import http from "node:http";
 import { mkdirSync, readFileSync, existsSync, createReadStream, statSync } from "node:fs";
 import { resolve, dirname, extname, sep } from "node:path";
@@ -51,15 +51,32 @@ http
       )
         return json(403, { error: "Use your authorized Tailscale identity" });
       if (url.pathname.startsWith("/api/")) {
+        if (req.method === "GET" && url.pathname === "/api/foods/label") {
+          const code = url.searchParams.get("code") || "";
+          if (!/^\d{4,18}$/.test(code)) return json(400,{error:"Invalid product code"});
+          try {
+            const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=code,product_name,brands,serving_size,nutriments,nutrition_data_per`,
+              {signal:AbortSignal.timeout(12000),headers:{"User-Agent":"LogiCal/1.0 (https://github.com/AJBrasil/LogiCal-Nutrition-Tracker)"}});
+            if (!response.ok) return json(response.status === 429 ? 429 : 502,{error:"Nutrition label unavailable"});
+            const food = labelFood((await response.json()).product);
+            if (!food) return json(404,{error:"No complete nutrition label"});
+            try {store.cacheProducts([food]);} catch (error) {console.warn("Product cache write failed", error.code);}
+            return json(200,food);
+          } catch {return json(502,{error:"Nutrition label unavailable"});}
+        }
         if (req.method === "GET" && url.pathname === "/api/foods/products") {
           try {
             const foods = await searchProducts(url.searchParams.get("q") || "");
-            store.cacheProducts(foods);
+            try {
+              store.cacheProducts(foods.filter(food => !food.needsLabel));
+            } catch (error) {
+              console.warn("Product cache write failed code=%s",error.code || error.name);
+            }
             console.info("GET /api/foods/products openfoodfacts matches=%d", foods.length);
             return json(200, foods);
           } catch (error) {
             const status = error.status || 502;
-            console.warn("GET /api/foods/products status=%d",status);
+            console.warn("GET /api/foods/products status=%d reason=%s",status,error.detail || error.code || error.name);
             return json(status, {error:error.status ? error.message : "Open Food Facts is unavailable. Try again shortly."});
           }
         }

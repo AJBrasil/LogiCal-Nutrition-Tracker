@@ -25,3 +25,25 @@ test("provider failures remain retryable and distinct from an empty search", asy
   await assert.rejects(search("cereal"),{status:429});
   assert.deepEqual(await search("cereal"),[]);
 });
+
+test("recovers connection setup errors through the native client", async () => {
+  let retries = 0;
+  const search = createProductSearch(async () => {throw new TypeError("fetch failed",{cause:{code:"UNABLE_TO_VERIFY_LEAF_SIGNATURE"}});},
+    async url => {retries++; assert.equal(url.protocol,"https:"); return Response.json({products:[]});});
+  assert.deepEqual(await search("oats"), []);
+  assert.equal(retries,1);
+});
+
+test("reports the upstream HTTP status without retrying rejected requests", async () => {
+  const search = createProductSearch(async () => new Response(null,{status:403}), () => assert.fail("unexpected retry"));
+  await assert.rejects(search("oats"),{status:502,detail:"upstream-403"});
+});
+
+test("a legacy search outage returns selectable products from the independent index", async () => {
+  const search = createProductSearch(async url => {
+    if (url.pathname === "/cgi/search.pl") return new Response(null,{status:503});
+    assert.equal(url.hostname,"search.openfoodfacts.org");
+    return Response.json({hits:[{code:"123456789",product_name:"Oat cereal",brands:["House"]}]});
+  });
+  assert.deepEqual(await search("oats"),[{barcode:"123456789",name:"House Oat cereal",source:"Open Food Facts",needsLabel:true}]);
+});
