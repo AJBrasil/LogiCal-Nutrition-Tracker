@@ -78,7 +78,7 @@ export default function OnboardingModal({
     const pCals = baseCalories * pRatio;
     const cCals = baseCalories * cRatio;
     const fCals = baseCalories * fRatio;
-    setProtein(Math.round(pCals / 4));
+    if (!proteinLocked) setProtein(Math.round(pCals / 4));
     setCarbs(Math.round(cCals / 4));
     setFat(Math.round(fCals / 9));
   };
@@ -359,6 +359,8 @@ export default function OnboardingModal({
                     Protein
                   </span>
                   <button
+                    aria-label="Lock protein target"
+                    aria-pressed={proteinLocked}
                     onClick={() => {
                       triggerHaptic();
                       setProteinLocked(!proteinLocked);
@@ -370,7 +372,7 @@ export default function OnboardingModal({
                     }`}
                   >
                     {proteinLocked ? <Lock size={10} /> : <Unlock size={10} />}
-                    {proteinLocked ? "LOCKED" : "AUTO"}
+                    {proteinLocked ? "LOCKED" : "UNLOCKED"}
                   </button>
                 </div>
                 <div className="text-[14px] font-mono font-bold text-[#4DA6FF]">
@@ -387,7 +389,8 @@ export default function OnboardingModal({
                 step={5}
                 value={protein}
                 onChange={(e) => setProtein(parseInt(e.target.value, 10))}
-                disabled={!proteinLocked}
+                disabled={proteinLocked}
+                aria-label="Protein target in grams"
                 className="w-full accent-[#4DA6FF] cursor-pointer"
               />
             </div>

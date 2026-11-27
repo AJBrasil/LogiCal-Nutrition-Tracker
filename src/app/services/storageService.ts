@@ -1,4 +1,4 @@
-import defaultFavorites from "./defaultFavorites.json" with { type: "json" };
+
 import { serverMode, records, change, healthExports } from "./serverSync.ts";
 export type MealPeriod = "morning" | "afternoon" | "evening";
 
@@ -374,7 +374,7 @@ export function loadDemoData(): void {
   setStorageMap(map);
 }
 
-export const DEFAULT_FAVORITE_MEALS = defaultFavorites as FoodEntry[];
+export const DEFAULT_FAVORITE_MEALS: FoodEntry[] = [];
 
 export function getFavoriteMeals(): FoodEntry[] {
   if(serverMode) return Object.entries(records()).filter(([k])=>k.startsWith('favorite:')).map(([,v])=>v);

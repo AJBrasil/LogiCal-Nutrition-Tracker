@@ -61,3 +61,28 @@ test("retry, independent device edit, export receipt, restart and backup restore
     rmSync(dir, { recursive: true });
   }
 });
+
+test("upgrading clears the original quick meals once and preserves the diary", async () => {
+  const { default: presets } = await import("../src/app/services/defaultFavorites.json", { with: { type: "json" } });
+  const dir = mkdtempSync(join(tmpdir(), "logical-favorites-"));
+  const file = join(dir, "test.sqlite");
+  let store = openStore(file);
+  try {
+    assert.deepEqual(store.read(), {});
+    store.db.exec("DELETE FROM setup; INSERT INTO setup VALUES (1)");
+    const insert = store.db.prepare("INSERT INTO records VALUES (?,?)");
+    for (const item of presets) insert.run("favorite:" + item.id, JSON.stringify(item));
+    const mealKey = "meal:2026-11-26:" + presets[0].id;
+    insert.run(mealKey, JSON.stringify(presets[0]));
+    store.db.close();
+    store = openStore(file);
+    assert.deepEqual(store.read(), { [mealKey]: presets[0] });
+    store.apply([{id: randomUUID(), changes: [["favorite:" + presets[0].id, presets[0]]]}]);
+    store.db.close();
+    store = openStore(file);
+    assert.ok(store.read()["favorite:" + presets[0].id]);
+  } finally {
+    store.db.close();
+    rmSync(dir, {recursive:true, force:true});
+  }
+});

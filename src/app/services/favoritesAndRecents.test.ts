@@ -41,11 +41,11 @@ Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
 });
 
-test("favorites: loads default curated favorites when storage is uninitialized", () => {
+test("favorites: starts with an empty list when storage is uninitialized", () => {
   mockStorage.clear();
   const favorites = getFavoriteMeals();
   assert.equal(favorites.length, DEFAULT_FAVORITE_MEALS.length);
-  assert.equal(favorites[0]?.name, "Whey Protein Shake");
+  assert.deepEqual(favorites, []);
 });
 
 test("favorites: adds custom favorite meal and deduplicates existing name", () => {

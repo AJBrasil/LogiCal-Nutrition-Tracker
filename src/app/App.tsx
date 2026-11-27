@@ -6,6 +6,7 @@ import type { MealPeriod } from "./services/storageService";
 
 import BarcodeScannerModal from "./components/BarcodeScannerModal";
 import OnboardingModal from "./components/OnboardingModal";
+import TabBar from "./components/TabBar";
 import ServerSettings from "./components/ServerSettings";
 import {getFavoriteMeals} from "./services/storageService";
 import VoiceInputModal from "./components/VoiceInputModal";
@@ -43,10 +44,14 @@ export default function App() {
   } = useNutritionState();
 
   return (
-    <div className="min-h-screen bg-[#070709] flex items-center justify-center p-0 select-none">
+    <div className="logical-app bg-[#070709]">
       <Toaster position="top-center" richColors theme="dark" />
 
-      <div className="relative overflow-hidden w-full max-w-2xl h-[100dvh] bg-background text-foreground">
+      <aside className="desktop-sidebar"><strong>LogiCal</strong>
+        <TabBar sidebar activeScreen={screen} onTabChange={s=>{setShowSettings(false);setScreen(s);}}/>
+        <button onClick={()=>setShowSettings(true)}>Settings</button>
+      </aside>
+      <div className="app-content relative overflow-hidden bg-background text-foreground">
         <div className="absolute inset-0 overflow-hidden">
           {screen === "dashboard" && (
             <DashboardScreen

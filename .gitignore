@@ -39,3 +39,10 @@ ios/App/build/
 **/*.xcodeproj/xcuserdata/
 **/*.xcodeproj/project.xcworkspace/xcuserdata/
 **/xcshareddata/swiftpm/
+
+# Personal nutrition databases and SQLite sidecar files
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+LogiCal-*.json

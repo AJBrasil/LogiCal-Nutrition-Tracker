@@ -279,8 +279,8 @@ export default function DashboardScreen({
   const evening = entries.filter((e) => e.time === "evening");
 
   return (
-    <div className="relative flex flex-col h-full bg-background">
-      <div className="flex items-center justify-between px-4 pt-12 pb-3 shrink-0">
+    <div className="diary relative flex flex-col h-full bg-background">
+      <div className="diary-header flex items-center justify-between px-4 pt-12 pb-3 shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={onPrevDate}
@@ -325,7 +325,7 @@ export default function DashboardScreen({
       </div>
 
       <div
-        className="mx-4 rounded-2xl p-4 mb-4 shrink-0 shadow-sm"
+        className="diary-summary mx-4 rounded-2xl p-4 mb-4 shrink-0 shadow-sm"
         style={{ background: "#141418", border: "1px solid rgba(255,255,255,0.07)" }}
       >
         <div className="flex items-baseline justify-between mb-3">
@@ -393,7 +393,7 @@ export default function DashboardScreen({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-2" style={{ scrollbarWidth: "none" }}>
+      <div className="diary-meals flex-1 overflow-y-auto pb-2" style={{ scrollbarWidth: "none" }}>
         {entries.length === 0 ? (
           <div className="text-center py-12 px-6">
             <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3 text-muted-foreground">
@@ -414,9 +414,9 @@ export default function DashboardScreen({
         <div className="h-4" />
       </div>
 
-      <div className="flex justify-between items-center px-4 text-xs"><span aria-live="polite">{syncLabel()}</span>{breakfast.length>0 && <button onClick={copyBreakfast}>Copy yesterday’s breakfast</button>}</div>
+      <div className="diary-status flex justify-between items-center px-4 text-xs"><span aria-live="polite">{syncLabel()}</span>{breakfast.length>0 && <button onClick={copyBreakfast}>Copy yesterday’s breakfast</button>}</div>
       {quickItems.length > 0 && (
-        <div className="px-4 pt-1 pb-1 shrink-0">
+        <div className="diary-quick px-4 pt-1 pb-1 shrink-0">
           <div className="flex items-center gap-1.5 overflow-x-auto py-1" style={{ scrollbarWidth: "none" }}>
             <span className="flex items-center gap-1 text-[9px] uppercase font-mono tracking-wider text-muted-foreground shrink-0 pr-1">
               <Star size={10} className="text-[#FFB84D]" fill="#FFB84D" />
@@ -444,7 +444,7 @@ export default function DashboardScreen({
       )}
 
       <div
-        className="px-4 pt-1 pb-2 shrink-0"
+        className="diary-compose px-4 pt-1 pb-2 shrink-0"
         style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
       >
         <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: "#1A1A22" }}>

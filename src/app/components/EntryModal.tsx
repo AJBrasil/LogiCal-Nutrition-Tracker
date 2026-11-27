@@ -30,7 +30,7 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
   return (
     <div className="absolute inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom duration-200"
+        className="entry-sheet rounded-t-3xl overflow-y-auto animate-in slide-in-from-bottom duration-200"
         style={{ background: "#1A1A22", borderTop: "1px solid rgba(255,255,255,0.1)" }}
         onClick={(e) => e.stopPropagation()}
       >

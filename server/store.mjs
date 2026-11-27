@@ -21,10 +21,11 @@ export function openStore(path) {
   };
   transaction(() => {
     db.exec("CREATE TABLE IF NOT EXISTS setup (version INTEGER PRIMARY KEY)");
-    if (db.prepare("INSERT OR IGNORE INTO setup VALUES (1)").run().changes) {
-      const insert = db.prepare("INSERT OR IGNORE INTO records VALUES (?,?)");
-      for (const item of defaultFavorites)
-        insert.run("favorite:" + item.id, JSON.stringify(item));
+    if (db.prepare("INSERT OR IGNORE INTO setup VALUES (2)").run().changes) {
+      const removePreset = db.prepare("DELETE FROM records WHERE key=? AND value=?");
+      for (const item of defaultFavorites) {
+        removePreset.run("favorite:" + item.id, JSON.stringify(item));
+      }
     }
   });
   return {

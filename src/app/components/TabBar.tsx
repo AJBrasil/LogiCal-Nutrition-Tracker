@@ -13,10 +13,10 @@ const tabs: { screen: Screen; label: string; Icon: typeof LayoutDashboard }[] = 
   { screen: "goals", label: "Goals", Icon: Target },
 ];
 
-export default function TabBar({ activeScreen, onTabChange }: TabBarProps) {
+export default function TabBar({ activeScreen, onTabChange, sidebar = false }: TabBarProps & { sidebar?: boolean }) {
   return (
-    <div
-      className="flex items-center px-4 pb-8 pt-2 shrink-0"
+    <nav aria-label="Main navigation"
+      className={sidebar ? "desktop-tabs" : "mobile-tabs flex items-center px-4 pt-2 shrink-0"}
       style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
     >
       {tabs.map(({ screen, label, Icon }) => {
@@ -24,6 +24,7 @@ export default function TabBar({ activeScreen, onTabChange }: TabBarProps) {
 
         return (
           <button
+            aria-current={active ? "page" : undefined}
             key={screen}
             className="flex-1 flex flex-col items-center gap-1 py-1"
             onClick={() => onTabChange(screen)}
@@ -38,6 +39,6 @@ export default function TabBar({ activeScreen, onTabChange }: TabBarProps) {
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }

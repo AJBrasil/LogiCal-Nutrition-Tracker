@@ -207,6 +207,8 @@ export default function GoalsScreen({
                   Protein
                 </div>
                 <button
+                  aria-pressed={proteinLocked}
+                  aria-label="Lock protein target"
                   onClick={() => setProteinLocked((l) => !l)}
                   className="text-[9px] px-1.5 py-0.5 rounded transition-all duration-150"
                   style={{
@@ -216,7 +218,7 @@ export default function GoalsScreen({
                     border: `1px solid ${proteinLocked ? "rgba(0,217,138,0.3)" : "rgba(255,255,255,0.08)"}`,
                   }}
                 >
-                  {proteinLocked ? "LOCKED" : "LOCK"}
+                  {proteinLocked ? "LOCKED" : "UNLOCKED"}
                 </button>
               </div>
               <span
@@ -235,7 +237,8 @@ export default function GoalsScreen({
               onChange={(e) => setProtein(parseInt(e.target.value, 10))}
               className="w-full cursor-pointer"
               style={{ accentColor: "#4DA6FF" }}
-              disabled={!proteinLocked}
+              disabled={proteinLocked}
+                aria-label="Protein target in grams"
             />
           </div>
 

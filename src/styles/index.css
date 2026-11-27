@@ -1,3 +1,41 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+.logical-app {
+  height: 100dvh;
+  color: var(--foreground);
+}
+.app-content { height: 100%; min-width: 0; }
+.desktop-sidebar { display: none; }
+.mobile-tabs { padding-bottom: max(.5rem, env(safe-area-inset-bottom)); }
+.mobile-tabs button { min-height: 44px; }
+.diary input:disabled, input[type=range]:disabled { cursor: default; opacity: .6; }
+@media (max-height: 600px) and (max-width: 899px) {
+  .diary { overflow-y: auto; }
+  .diary-meals { flex: 1 0 9rem; }
+  .diary-header { padding-top: .75rem; }
+}
+@media (min-width: 900px) {
+  .logical-app { display: grid; grid-template-columns: 12rem minmax(0, 1fr); max-width: 96rem; margin-inline: auto; }
+  .desktop-sidebar { display: flex; flex-direction: column; gap: 2rem; padding: 2rem 1rem; border-right: 1px solid var(--border); }
+  .desktop-sidebar strong { font-size: 1.5rem; }
+  .desktop-sidebar > button { margin-top: auto; text-align: left; padding: .75rem; }
+  .desktop-tabs { display: grid; gap: .5rem; }
+  .desktop-tabs button { flex-direction: row; justify-content: flex-start; padding: .75rem; gap: .75rem; border-radius: .5rem; }
+  .desktop-tabs button[aria-current=page] { background: var(--muted); }
+  .desktop-tabs span { font-size: .85rem; }
+  .mobile-tabs { display: none; }
+  .diary { display: grid; grid-template-columns: minmax(16rem, 2fr) minmax(18rem, 3fr); grid-template-rows: auto auto auto auto minmax(0,1fr); grid-template-areas: "head head" "summary meals" "compose meals" "quick meals" "status meals"; align-items: start; padding: 1rem; overflow-y: auto; }
+  .diary-header { grid-area: head; padding-block: 1rem 2rem; }
+  .diary-summary { grid-area: summary; }
+  .diary-meals { grid-area: meals; max-height: 100%; }
+  .diary-compose { grid-area: compose; }
+  .diary-status { grid-area: status; }
+  .diary-quick { grid-area: quick; min-width: 0; }
+  .app-content > section, .app-content > .absolute > .flex:not(.diary) { padding-inline: clamp(1rem,5vw,6rem); }
+}
+.entry-sheet { width: 100%; max-height: 100%; }
+@media (min-width: 900px) {
+  .entry-sheet { max-width: 36rem; align-self: center; }
+}
