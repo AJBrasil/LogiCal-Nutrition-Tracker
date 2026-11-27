@@ -52,7 +52,7 @@
 .nutrition-fields input:not([type=checkbox]),.nutrition-actions input,.foods-page input,.foods-page select {background:var(--muted);border-radius:.4rem;padding:.45rem;max-width:100%;}
 .nutrition-fields label,.foods-page main label {display:block;}
 .nutrition-actions input[type=number] {width:6rem;}
-.food-results {margin-top:.4rem;max-height:min(31dvh,16rem);overflow:auto;border:1px solid var(--border);border-radius:.75rem;background:var(--card);}
+.food-results {margin-top:.4rem; max-height:min(31dvh,16rem); overflow:auto; border:1px solid var(--border); border-radius:.75rem; background:var(--card);}
 .food-results p,.food-results button {padding:.55rem .8rem;font-size:.85rem;}
 .food-results p,.food-results small {color:var(--muted-foreground);}
 .food-results button {display:flex;width:100%;align-items:center;justify-content:space-between;gap:.75rem;text-align:left;border-top:1px solid var(--border);}
@@ -64,3 +64,9 @@
 .portion-fields label {font-size:.8rem;color:var(--muted-foreground);}
 .portion-fields input {display:block;width:100%;padding:.5rem;border:1px solid var(--border);background:#252530;color:var(--foreground);border-radius:.4rem;margin-top:.2rem;}
 .entry-sheet button:disabled {opacity:.45;}
+.serving-summary {grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;}
+.serving-summary span,.serving-summary small {font-size:.8rem;color:var(--muted-foreground);}
+.serving-summary p,.serving-summary output {display:block;margin:.35rem 0 0;font-weight:600;overflow-wrap:anywhere;}
+.portion-definition {margin:.65rem 0;font-size:.85rem;}
+.portion-definition summary {cursor:pointer;}
+@media(max-width:440px){.serving-summary {grid-template-columns:1fr;}}

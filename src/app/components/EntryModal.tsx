@@ -90,6 +90,36 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
             />
           </div>
 
+          <fieldset className="entry-group"><legend>Serving size</legend>
+            {!library && <div className="portion-fields serving-summary">
+              <label>Number of servings
+                <input type="number" step="any" min="0.01" value={portions} onChange={e=>setPortions(e.target.value)}/>
+              </label>
+              <div><span>Portion size</span>
+                <p>{data.servingSize || (base.grams != null ? base.grams + " g" : "1 serving")}</p>
+                {data.servingSize && base.grams != null && !/\b(?:g|grams?)\b|\d\s*g\b/i.test(data.servingSize) && <small>{base.grams} g per serving</small>}
+              </div>
+              <div><span>Total amount eaten</span>
+                <output aria-live="polite">{validCount ? totals.grams != null ? totals.grams + " g" : count + (count === 1 ? " serving" : " servings") : "—"}</output>
+              </div>
+            </div>}
+            {(library || editPortion || referencePortion(initialData).grams == null) && <details open={library || undefined} className="portion-definition">
+              <summary>Define one serving</summary>
+              <div className="portion-fields">
+                {editPortion && <label>Portion description
+                  <input placeholder="e.g. 1 bar (40 g)" value={data.servingSize || ""} onChange={e=>setData({...data,servingSize:e.target.value})}/>
+                </label>}
+                <label>Grams per serving
+                  <input type="number" min="0" step="any" placeholder="Unknown" value={base.grams ?? ""} onChange={e=>setData({...data,grams:Number(e.target.value)>0 ? Number(e.target.value) : undefined})}/>
+                </label>
+              </div>
+            </details>}
+            {(isFav || library) && <div className="portion-fields">
+          {library && <label>Barcode <input inputMode="numeric" value={data.barcode||""} onChange={e=>setData({...data,barcode:e.target.value.replace(/\D/g,"")})}/></label>}
+          {(isFav || library) && <label> Food alias <input placeholder="my usual chicken" value={data.alias || ''} onChange={e=>setData({...data,alias:e.target.value})}/></label>}
+            </div>}
+          </fieldset>
+
           <div className="mb-4">
             <div
               className="text-[10px] tracking-widest uppercase text-muted-foreground mb-2"
@@ -130,22 +160,6 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
             </div>
           </div>
 
-          <fieldset className="entry-group"><legend>Serving size</legend>
-          <div className="portion-fields">
-          <label>Portion size for one serving
-            <input readOnly={!editPortion} placeholder="e.g. 1 bar (40 g)" value={data.servingSize || (editPortion ? "" : "1 serving")} onChange={e=>setData({...data,servingSize:e.target.value})}/>
-          </label>
-          <label>Grams per serving
-            <input type="number" min="0" step="any" placeholder="Unknown" readOnly={!editPortion && referencePortion(initialData).grams != null}
-              value={base.grams ?? ""} onChange={e=>setData({...data,grams:Number(e.target.value)>0 ? Number(e.target.value) : undefined})}/>
-          </label>
-          {!library && <>
-            <label>Servings eaten <input aria-label="Servings" type="number" step="any" min="0.01" value={portions} onChange={e=>setPortions(e.target.value)}/></label>
-            <label>Total grams eaten <output className="block">{validCount && totals.grams != null ? totals.grams + " g" : "—"}</output></label>
-          </>}
-          {library && <label>Barcode <input inputMode="numeric" value={data.barcode||""} onChange={e=>setData({...data,barcode:e.target.value.replace(/\D/g,"")})}/></label>}
-          {(isFav || library) && <label> Food alias <input placeholder="my usual chicken" value={data.alias || ''} onChange={e=>setData({...data,alias:e.target.value})}/></label>}
-          </div></fieldset>
           <fieldset className="entry-group"><legend>Nutrition per serving</legend>
           <div className="flex items-baseline justify-between mb-3">
             <span
