@@ -1,6 +1,6 @@
 import {ExtraFields} from "./NutritionDetails";
-import {scaleExtras} from "../services/nutrients";
-import { useRef, useState } from "react";
+import {forServings,referencePortion} from "../services/portions";
+import { useState } from "react";
 import { Star } from "lucide-react";
 
 import { isFavoriteMeal, saveFavoriteMeal, getFavoriteMeals, removeFavoriteMeal } from "../services/storageService";
@@ -22,10 +22,14 @@ interface EntryModalProps {
 }
 
 export default function EntryModal({ manualEntry=false, library=false,initialData, onClose, onLog }: EntryModalProps) {
-  const [data, setData] = useState<ModalMacros>(initialData);
+  const [data, setData] = useState<ModalMacros>(() => ({...initialData,...referencePortion(initialData)}));
   const [entered, setEntered] = useState<Record<string,boolean>>({});
-  const [portions,setPortions]=useState("1");
-  const lastPortions = useRef(1);
+  const [portions,setPortions] = useState(String(library ? 1 : initialData.servings || 1));
+  const count = Number(portions);
+  const validCount = Number.isFinite(count) && count > 0;
+  const base = referencePortion({...data,perServing:undefined});
+  const totals = forServings(base, validCount ? count : 0);
+  const editPortion = library || manualEntry || !initialData.servingSize;
   const [isFav, setIsFav] = useState<boolean>(() => isFavoriteMeal(initialData.name));
 
   const updateMacro = (key: "calories" | "protein" | "carbs" | "fat", val: string) => {
@@ -48,7 +52,7 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
 
         <div className="px-4 pt-2 pb-6">
           <h2 className="text-xl font-semibold mb-3">{library ? "Library food" : "Review food entry"}</h2>
-          {manualEntry && <p className="mb-3">Enter the nutrition for your portion before logging this food.</p>}
+          {manualEntry && <p className="mb-3">Enter the nutrition for one serving before logging this food.</p>}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1">
               <span
@@ -128,27 +132,21 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
 
           <fieldset className="entry-group"><legend>Serving size</legend>
           <div className="portion-fields">
-          <label>Number of servings <input aria-label="Servings" type="number" step="any" min="0.01" value={portions} onChange={e=>{
-            const value=e.target.value;setPortions(value);
-            const n=Number(value);
-            if (!Number.isFinite(n) || n <= 0) return;
-            const ratio = n / lastPortions.current;
-            lastPortions.current = n;
-            setData(prev=>({...prev,
-              ...scaleExtras(prev,ratio), grams:prev.grams?prev.grams*ratio:undefined,
-              calories:Math.round(prev.calories*ratio),protein:Math.round(prev.protein*ratio*10)/10,
-              carbs:Math.round(prev.carbs*ratio*10)/10,fat:Math.round(prev.fat*ratio*10)/10,
-              servingSize:n===1?initialData.servingSize:(initialData.servingSize || '1 serving').replace(/^(\d+(?:\.\d+)?(?:\/\d+)?)/,q=>{
-                const [a,b='1']=q.split('/');return String(Math.round(Number(a)/Number(b)*n*100)/100);
-              })
-            }));
-          }}/></label>
-          <label>Portion description <input placeholder="4 oz" value={data.servingSize || ''} onChange={e=>setData({...data,servingSize:e.target.value})}/></label>
+          <label>Portion size for one serving
+            <input readOnly={!editPortion} placeholder="e.g. 1 bar (40 g)" value={data.servingSize || (editPortion ? "" : "1 serving")} onChange={e=>setData({...data,servingSize:e.target.value})}/>
+          </label>
+          <label>Grams per serving
+            <input type="number" min="0" step="any" placeholder="Unknown" readOnly={!editPortion && referencePortion(initialData).grams != null}
+              value={base.grams ?? ""} onChange={e=>setData({...data,grams:Number(e.target.value)>0 ? Number(e.target.value) : undefined})}/>
+          </label>
+          {!library && <>
+            <label>Servings eaten <input aria-label="Servings" type="number" step="any" min="0.01" value={portions} onChange={e=>setPortions(e.target.value)}/></label>
+            <label>Total grams eaten <output className="block">{validCount && totals.grams != null ? totals.grams + " g" : "—"}</output></label>
+          </>}
           {library && <label>Barcode <input inputMode="numeric" value={data.barcode||""} onChange={e=>setData({...data,barcode:e.target.value.replace(/\D/g,"")})}/></label>}
-          <label>Total grams <input type="number" min="0" step="any" value={data.grams??""} onChange={e=>setData({...data,grams:Number(e.target.value)||undefined})}/></label>
           {(isFav || library) && <label> Food alias <input placeholder="my usual chicken" value={data.alias || ''} onChange={e=>setData({...data,alias:e.target.value})}/></label>}
           </div></fieldset>
-          <fieldset className="entry-group"><legend>Nutrition for this amount</legend>
+          <fieldset className="entry-group"><legend>Nutrition per serving</legend>
           <div className="flex items-baseline justify-between mb-3">
             <span
               className="text-[11px] tracking-widest uppercase text-muted-foreground"
@@ -194,6 +192,7 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
 
           <details><summary>Nutrition label details</summary><ExtraFields value={data} onChange={next=>setData({...data,...next})}/></details>
           </fieldset>
+          {!library && validCount && <p className="mb-4">For {count} {count === 1 ? "serving" : "servings"}: {totals.calories} kcal · {totals.protein} g protein · {totals.carbs} g carbs · {totals.fat} g fat</p>}
 
           <div className="flex gap-3">
             <button
@@ -204,16 +203,17 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
               Cancel
             </button>
             <button
-              disabled={(manualEntry && !Object.values(entered).some(Boolean)) || !data.name.trim() || Number(portions)<=0}
+              disabled={(manualEntry && !Object.values(entered).some(Boolean)) || !data.name.trim() || !validCount}
               onClick={() => {
-                if(library){onLog(data);return;}
+                const single = {...data,...base,servings:1,perServing:base};
+                if(library){onLog(single);return;}
                 if (isFav && data.name.trim()) {
-                  saveFavoriteMeal(data);
+                  saveFavoriteMeal(single);
                 } else {
                   const existing=getFavoriteMeals().find(f=>f.name.toLowerCase()===data.name.toLowerCase());
                   if(existing)removeFavoriteMeal(existing.id);
                 }
-                onLog(data);
+                onLog({...single,...forServings(base,count),servings:count});
               }}
               className="flex-[2] py-3.5 rounded-xl text-[14px] font-medium transition-colors active:opacity-80"
               style={{ background: "#00D98A", color: "#0A0A0C", fontFamily: "Inter, sans-serif" }}

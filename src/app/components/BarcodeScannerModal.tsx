@@ -1,3 +1,4 @@
+import {referencePortion,forServings} from "../services/portions";
 import {getFavoriteMeals} from "../services/storageService";
 import type {ModalMacros} from "../types";
 import { useEffect, useRef, useState } from "react";
@@ -221,17 +222,11 @@ export default function BarcodeScannerModal({ library=false,onClose, onLogProduc
 
   const handleConfirmLog = () => {
     if (!product) return;
-    const scaled = scaleBarcodeNutrition(product, multiplier);
+    const base = referencePortion({...product, grams:product.servingWeightGrams});
     triggerHaptic();
     onLogProduct({
-      ...scaled, grams:scaled.servingWeightGrams,
-      name: product.name,
-      calories: scaled.calories,
-      protein: scaled.protein,
-      carbs: scaled.carbs,
-      fat: scaled.fat,
-      time: mealPeriod,
-      servingSize: scaled.servingSize,
+      ...forServings(base,multiplier), perServing:base, servings:multiplier,
+      name:product.name, time:mealPeriod, servingSize:product.servingSize,
       barcode: product.barcode,
     });
     onClose();
@@ -354,7 +349,7 @@ export default function BarcodeScannerModal({ library=false,onClose, onLogProduc
                   {product.name}
                 </div>
                 <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
-                  UPC: {product.barcode} · {scaled.servingSize}
+                  UPC: {product.barcode} · {product.servingSize} per serving
                 </div>
                 <div className="mt-1">
                   <span className={`text-[9px] uppercase tracking-wider rounded-md px-1.5 py-0.5 border ${confidence.className}`}>

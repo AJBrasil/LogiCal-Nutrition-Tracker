@@ -1,3 +1,4 @@
+import {forServings,referencePortion} from "./portions.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -83,4 +84,23 @@ test("normalizes invalid stored nutrition numbers to zero", () => {
   assert.equal(entries[0]?.calories, 0);
   assert.equal(entries[0]?.carbs, 0);
   assert.equal(getDailyTotals(entries).protein, 10);
+});
+
+test("the diary preserves one serving independently of the amount eaten", () => {
+  const food = {name:"Oats", time:"morning" as const, servingSize:"½ cup (40 g)", calories:150, protein:5, carbs:27, fat:3, fiber:4};
+  const perServing = referencePortion(food);
+  assert.equal(perServing.grams,40);
+  const logged = saveEntry("2026-10-15",{...food,...forServings(perServing,1.5),perServing,servings:1.5});
+  const stored = getEntriesForDate("2026-10-15").find(entry=>entry.id === logged.id)!;
+  assert.equal(stored.servingSize,food.servingSize);
+  assert.equal(stored.servings,1.5);
+  assert.equal(stored.grams,60);
+  assert.equal(stored.calories,225);
+  assert.equal(stored.fiber,6);
+  assert.deepEqual(forServings(referencePortion(stored),1),perServing);
+});
+
+test("a portion with only a volume has unknown mass", () => {
+  const base = referencePortion({servingSize:"250 ml",calories:100,protein:5,carbs:10,fat:4});
+  assert.equal(forServings(base,2).grams,undefined);
 });

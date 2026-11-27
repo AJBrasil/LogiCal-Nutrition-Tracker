@@ -104,7 +104,7 @@ function EntryRow({
             style={{ fontFamily: "DM Mono, monospace" }}
           >
             P{entry.protein} · C{entry.carbs} · F{entry.fat}
-            {entry.servingSize && ` · ${entry.servingSize}`}
+            {entry.servingSize && ` · ${entry.servings && entry.servings !== 1 ? entry.servings+" × " : ""}${entry.servingSize}`}
           </div>
         </div>
         <div className="text-right shrink-0">
@@ -561,7 +561,7 @@ export default function DashboardScreen({
           <p role="status">{!results ? "Searching foods…" : results.failed ? "Database unavailable. You can still enter a meal." :
             results.matches.length ? "Saved, recent and cached matches" : "No local matches."}</p>
           {results?.matches.filter(food => !food.barcode || !products?.matches.some(p => p.barcode === food.barcode)).map(({source, ...food}) => <button type="button" key={food.name} onClick={()=>handleQuickSelect(food)}>
-            <span><strong>{food.name}</strong><small>{source} · {food.servingSize || "1 logged portion"}</small></span>
+            <span><strong>{food.name}</strong><small>{source} · {food.servings && food.servings !== 1 ? food.servings+" × " : ""}{food.servingSize || "1 logged portion"}</small></span>
             <span>{food.calories} kcal</span>
           </button>)}
           <button type="button" onClick={()=>handleInputSubmit(query)}>Review typed entry</button>

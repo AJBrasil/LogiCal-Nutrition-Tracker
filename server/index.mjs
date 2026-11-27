@@ -55,7 +55,7 @@ http
           const code = url.searchParams.get("code") || "";
           if (!/^\d{4,18}$/.test(code)) return json(400,{error:"Invalid product code"});
           try {
-            const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=code,product_name,brands,serving_size,nutriments,nutrition_data_per`,
+            const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=code,product_name,brands,serving_size,serving_quantity,serving_quantity_unit,nutriments,nutrition_data_per`,
               {signal:AbortSignal.timeout(12000),headers:{"User-Agent":"LogiCal/1.0 (https://github.com/AJBrasil/LogiCal-Nutrition-Tracker)"}});
             if (!response.ok) return json(response.status === 429 ? 429 : 502,{error:"Nutrition label unavailable"});
             const food = labelFood((await response.json()).product);

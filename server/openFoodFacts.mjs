@@ -58,7 +58,7 @@ export function createProductSearch(fetchProducts = fetch, recoverConnection = p
       }
       const url = new URL("https://world.openfoodfacts.org/cgi/search.pl");
       url.search = new URLSearchParams({action:"process", search_terms:term, search_simple:"1", json:"1", page_size:"24",
-        fields:"code,product_name,brands,serving_size,nutriments,nutrition_data_per"});
+        fields:"code,product_name,brands,serving_size,serving_quantity,serving_quantity_unit,nutriments,nutrition_data_per"});
       let response;
       try {
         response = await fetchProducts(url, {signal:AbortSignal.timeout(20000), headers:{
@@ -119,9 +119,12 @@ export function labelFood(product) {
       if (n !== undefined) extras[field] = field === "sodium" ? Math.round(n*1000) : n;
     }
     const liquid = product.nutrition_data_per === "100ml";
+    const quantity = Number(product.serving_quantity);
+    const grams = basis === "100g" ? (liquid ? undefined : 100)
+      : product.serving_quantity_unit === "g" && Number.isFinite(quantity) && quantity > 0 ? quantity : undefined;
     return {...extras, name:[typeof product.brands === "string" ? product.brands.split(",")[0].trim() : "",product.product_name.trim()].filter(Boolean).join(" "),
       barcode:String(product.code), servingSize:basis === "serving" ? product.serving_size : liquid ? "100 ml" : "100 g",
-      ...(basis === "100g" && !liquid ? {grams:100} : {}), calories:Math.round(kcal), protein, carbs, fat, source:"Open Food Facts"};
+      ...(grams == null ? {} : {grams}), calories:Math.round(kcal), protein, carbs, fat, source:"Open Food Facts"};
   }
   return null;
 }

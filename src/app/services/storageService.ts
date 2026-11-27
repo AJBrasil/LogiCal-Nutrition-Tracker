@@ -1,9 +1,10 @@
+import type {PortionInfo} from "./portions.ts";
 import {scaleExtras,type Extras,type Nutrient} from "./nutrients.ts";
 
 import { serverMode, records, change, healthExports } from "./serverSync.ts";
 export type MealPeriod = "morning" | "afternoon" | "evening";
 
-export interface FoodEntry extends Extras {
+export interface FoodEntry extends Extras, PortionInfo {
   grams?:number;
   recipe?:{yield:number;items:{name:string;quantity:number}[]};
   id: number;
@@ -136,7 +137,7 @@ function normalizeEntry(value: unknown): FoodEntry | null {
 
   return {
     id: entry.id,
-    ...scaleExtras(entry), grams:entry.grams,recipe:entry.recipe,
+    ...scaleExtras(entry), grams:entry.grams,recipe:entry.recipe, servings:entry.servings, perServing:entry.perServing,
     createdAt: entry.createdAt, alias: entry.alias,
     name: entry.name,
     calories: Number(entry.calories) || 0,
@@ -221,7 +222,7 @@ export function saveEntry(dateKey: string, entry: Omit<FoodEntry, "id">): FoodEn
     fat: Math.max(0, Number(entry.fat) || 0),
     time: entry.time,
     servingSize: entry.servingSize,
-    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe,
+    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe, servings:entry.servings, perServing:entry.perServing,
     barcode: entry.barcode,
     syncedToHealth: entry.syncedToHealth,
   };
@@ -414,7 +415,7 @@ export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">, originalId?:numbe
     fat: Math.max(0, Number(entry.fat) || 0),
     time: entry.time,
     servingSize: entry.servingSize,
-    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe,
+    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe, servings:entry.servings, perServing:entry.perServing,
     barcode: entry.barcode,
   };
 

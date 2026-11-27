@@ -3,7 +3,8 @@ import type { MealPeriod } from "./services/storageService";
 import type {Extras} from "./services/nutrients";
 export type Screen = "foods" | "dashboard" | "goals" | "analytics";
 
-export interface ModalMacros extends Extras {
+import type {PortionInfo} from "./services/portions";
+export interface ModalMacros extends Extras, PortionInfo {
   barcode?:string;
   grams?:number;
   name: string;
