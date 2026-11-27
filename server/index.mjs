@@ -1,3 +1,4 @@
+import {everydayFoods} from "./catalog/search.mjs";
 import {createProductSearch, labelFood} from "./openFoodFacts.mjs";
 import http from "node:http";
 import { mkdirSync, readFileSync, existsSync, createReadStream, statSync } from "node:fs";
@@ -82,7 +83,12 @@ http
         }
         if (req.method === "GET" && url.pathname === "/api/foods/search") {
           const start = performance.now();
-          const matches = store.searchFoods(url.searchParams.get("q") || "");
+          const query = url.searchParams.get("q") || "";
+          const local = store.searchFoods(query);
+          const seen = new Set(local.map(food => food.fdcId).filter(Boolean));
+          const matches = [...local.filter(food => food.source !== "Open Food Facts"),
+            ...everydayFoods(query).filter(food => !seen.has(food.fdcId)),
+            ...local.filter(food => food.source === "Open Food Facts")];
           console.info("GET /api/foods/search sqlite matches=%d duration_ms=%d", matches.length, Math.round(performance.now()-start));
           return json(200, matches);
         }

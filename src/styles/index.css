@@ -70,3 +70,5 @@
 .portion-definition {margin:.65rem 0;font-size:.85rem;}
 .portion-definition summary {cursor:pointer;}
 @media(max-width:440px){.serving-summary {grid-template-columns:1fr;}}
+.catalog-measure {display:flex;align-items:center;gap:.65rem;margin-bottom:.75rem;font-size:.85rem;}
+.catalog-measure select {min-width:0;max-width:80%;padding:.4rem;background:var(--muted);color:var(--foreground);border-radius:.4rem;}

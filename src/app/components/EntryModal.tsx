@@ -1,6 +1,6 @@
 import {keys} from "../services/nutrients";
 import {ExtraFields} from "./NutritionDetails";
-import {forServings,referencePortion} from "../services/portions";
+import {changePortionWeight,forServings,referencePortion} from "../services/portions";
 import { useState } from "react";
 import { Star } from "lucide-react";
 
@@ -32,6 +32,16 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
   const totals = forServings(base, validCount ? count : 0);
   const editPortion = library || manualEntry || !initialData.servingSize;
   const [isFav, setIsFav] = useState<boolean>(() => isFavoriteMeal(initialData.name));
+
+  const gramMode = !!data.fdcId && data.servingSize === "1 g";
+  const measures:[string,number][] = [["100 g",100],["1 g",1],...(data.portions || [])];
+  const selectedMeasure = measures.findIndex(([label,grams])=>label === data.servingSize && grams === base.grams);
+  function chooseMeasure(index:number) {
+    const [label,grams] = measures[index];
+    if (!base.grams) return;
+    setData(prev => ({...prev,...changePortionWeight(base,grams),servingSize:label}));
+    setPortions(String(grams === 1 && validCount ? totals.grams : 1));
+  }
 
   const updateMacro = (key: "calories" | "protein" | "carbs" | "fat", val: string) => {
     if (!validCount) return;
@@ -93,8 +103,13 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
           </div>
 
           <fieldset className="entry-group"><legend>Serving size</legend>
+            {data.fdcId && <label className="catalog-measure">Measure
+              <select value={selectedMeasure} onChange={e=>chooseMeasure(Number(e.target.value))}>
+                {measures.map(([label,grams],index)=><option value={index} key={index}>{index === 1 ? "Grams" : index === 0 ? "100 g serving" : label+" ("+grams+" g)"}</option>)}
+              </select>
+            </label>}
             {!library && <div className="portion-fields serving-summary">
-              <label>Number of servings
+              <label>{gramMode ? "Grams eaten" : "Number of servings"}
                 <input type="number" step="any" min="0.01" value={portions} onChange={e=>setPortions(e.target.value)}/>
               </label>
               <div><span>Portion size</span>
@@ -163,7 +178,7 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
           </div>
 
           <fieldset className="entry-group" disabled={!validCount}>
-          <legend>{library ? "Nutrition per serving" : validCount ? `Nutrition for ${count} ${count === 1 ? "serving" : "servings"}` : "Nutrition for amount eaten"}</legend>
+          <legend>{library ? "Nutrition per serving" : validCount ? `Nutrition for ${count} ${gramMode ? "g" : count === 1 ? "serving" : "servings"}` : "Nutrition for amount eaten"}</legend>
           <div className="flex items-baseline justify-between mb-3">
             <span
               className="text-[11px] tracking-widest uppercase text-muted-foreground"

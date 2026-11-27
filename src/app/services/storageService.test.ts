@@ -1,4 +1,4 @@
-import {forServings,referencePortion} from "./portions.ts";
+import {changePortionWeight,forServings,referencePortion} from "./portions.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -111,4 +111,17 @@ test("fractional per-serving edits preserve the entered total on reopening", () 
   assert.equal(totals.calories,240);
   assert.equal(totals.fiber,7);
   assert.equal(forServings(referencePortion({...totals,perServing:base}),3).fiber,14);
+});
+
+test("USDA gram and household measures persist with the consumed nutrients", () => {
+  const rice = {name:"Cooked rice",time:"morning" as const, servings:1.5,fdcId:123,portions:[["1 cup",158]] as [string,number][],
+    servingSize:"1 cup",calories:130,carbs:28,protein:2.7,fat:.3,grams:100};
+  const base = changePortionWeight(rice,158);
+  const saved = saveEntry("2026-10-18",{...rice,...forServings(base,1.5),perServing:base});
+  const restored = getEntriesForDate("2026-10-18").find(f=>f.id===saved.id);
+  assert.equal(restored.grams,237);
+  assert.equal(restored.calories,308.1);
+  assert.equal(restored.fdcId,123);
+  assert.deepEqual(restored.portions,rice.portions);
+  assert.equal(forServings(changePortionWeight(base,1),150).calories,195);
 });

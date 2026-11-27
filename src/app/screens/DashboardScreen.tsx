@@ -551,6 +551,12 @@ export default function DashboardScreen({
           </button>
         </div>
         {query && !showModal && <div className="food-results" aria-label="Food search results">
+          <p role="status">{!results ? "Searching foods…" : results.failed ? "Database unavailable. You can still enter a meal." :
+            results.matches.length ? "Your foods and everyday foods" : "No local matches."}</p>
+          {results?.matches.filter(food => !food.barcode || !products?.matches.some(p => p.barcode === food.barcode)).map(({source, ...food}) => <button type="button" key={food.fdcId || food.name} onClick={()=>handleQuickSelect(food)}>
+            <span><strong>{food.name}</strong><small>{source} · {food.servings && food.servings !== 1 ? food.servings+" × " : ""}{food.servingSize || "1 logged portion"}</small></span>
+            <span>{food.calories} kcal</span>
+          </button>)}
           {query.length < 3 && <p>Type at least 3 characters to search Open Food Facts.</p>}
           {products?.query === query && <><p role="status">{products.message}</p>
             {products.matches.map((food) => <button type="button" key={food.barcode} onClick={()=>openSearchResult(food)}>
@@ -558,12 +564,6 @@ export default function DashboardScreen({
             </button>)}
             {products.matches.length > 0 && <a href="https://openfoodfacts.org" target="_blank" rel="noreferrer" className="px-3 underline text-xs">Data from Open Food Facts (ODbL)</a>}
           </>}
-          <p role="status">{!results ? "Searching foods…" : results.failed ? "Database unavailable. You can still enter a meal." :
-            results.matches.length ? "Saved, recent and cached matches" : "No local matches."}</p>
-          {results?.matches.filter(food => !food.barcode || !products?.matches.some(p => p.barcode === food.barcode)).map(({source, ...food}) => <button type="button" key={food.name} onClick={()=>handleQuickSelect(food)}>
-            <span><strong>{food.name}</strong><small>{source} · {food.servings && food.servings !== 1 ? food.servings+" × " : ""}{food.servingSize || "1 logged portion"}</small></span>
-            <span>{food.calories} kcal</span>
-          </button>)}
           <button type="button" onClick={()=>handleInputSubmit(query)}>Review typed entry</button>
         </div>}
       </div>
