@@ -66,7 +66,7 @@ http
         }
         if (req.method === "GET" && url.pathname === "/api/foods/products") {
           try {
-            const foods = await searchProducts(url.searchParams.get("q") || "");
+            const foods = await searchProducts(url.searchParams.get("q") || "", url.searchParams.get("mode") === "suggest");
             try {
               store.cacheProducts(foods.filter(food => !food.needsLabel));
             } catch (error) {

@@ -47,3 +47,14 @@ test("a legacy search outage returns selectable products from the independent in
   });
   assert.deepEqual(await search("oats"),[{barcode:"123456789",name:"House Oat cereal",source:"Open Food Facts",needsLabel:true}]);
 });
+
+test("automatic suggestions use the product index and reuse cached results", async () => {
+  const requests = [];
+  const search = createProductSearch(async url => {
+    requests.push(url.hostname);
+    return Response.json({hits:[{code:"123456789",product_name:"Oat cereal"}]});
+  });
+  assert.equal((await search("oats",true))[0].name,"Oat cereal");
+  await search(" OATS ",true);
+  assert.deepEqual(requests,["search.openfoodfacts.org"]);
+});

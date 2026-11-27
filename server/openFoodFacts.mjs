@@ -19,22 +19,43 @@ function failure(message, status, detail) {
   return Object.assign(Error(message), {status, detail});
 }
 
-// Only send submitted searches. Open Food Facts limits its public search API to 10 requests/minute.
+// Use the product index for suggestions. Reserve the legacy search endpoint for submitted searches.
 export function createProductSearch(fetchProducts = fetch, recoverConnection = process.platform === "darwin" ? macFetch : null) {
   const recentRequests = [];
   const cache = new Map();
   const pending = new Map();
-  return async function searchProducts(query) {
+  async function searchIndex(term) {
+    const index = new URL("https://search.openfoodfacts.org/search");
+    index.search = new URLSearchParams({q:term,page_size:"16",fields:"code,product_name,brands"});
+    const response = await fetchProducts(index, {signal:AbortSignal.timeout(12000),headers:{"User-Agent":userAgent}});
+    if (!response.ok) throw failure(`Open Food Facts returned HTTP ${response.status}. Saved and cached foods are still searchable.`,response.status === 429 ? 429 : 502,"index-" + response.status);
+    const {hits} = await response.json();
+    if (!Array.isArray(hits)) throw failure("Invalid product list from Open Food Facts.",502,"invalid-index");
+    return hits.filter(hit => /^\d{4,18}$/.test(hit?.code) && typeof hit.product_name === "string" && hit.product_name.trim())
+      .map(hit => ({barcode:String(hit.code),name:[String((Array.isArray(hit.brands) ? hit.brands[0] : hit.brands) || "").replace(/^[a-z]{2}:/,""),hit.product_name].filter(Boolean).join(" "),
+        source:"Open Food Facts",needsLabel:true}));
+  }
+  return async function searchProducts(query, suggest = false) {
     const term = query.trim().toLowerCase();
     if (!term || term.length > 160) throw Object.assign(Error("Enter a food or brand name."), {status:400});
     const now = Date.now();
-    const cached = cache.get(term);
+    const key = (suggest ? "suggest:" : "full:") + term;
+    function remember(foods) {
+      if (cache.size >= 100) cache.delete(cache.keys().next().value);
+      cache.set(key,{foods,time:Date.now()});
+    }
+    const cached = cache.get(key);
     if (cached && now - cached.time < 3600000) return cached.foods;
-    if (pending.has(term)) return pending.get(term);
+    if (pending.has(key)) return pending.get(key);
     while (recentRequests.length && recentRequests[0] <= now - 60000) recentRequests.shift();
     if (recentRequests.length >= 10) throw Object.assign(Error("Search limit reached. Try again in a minute."), {status:429});
     recentRequests.push(now);
     const request = (async () => {
+      if (suggest) {
+        const foods = await searchIndex(term);
+        remember(foods);
+        return foods;
+      }
       const url = new URL("https://world.openfoodfacts.org/cgi/search.pl");
       url.search = new URLSearchParams({action:"process", search_terms:term, search_simple:"1", json:"1", page_size:"24",
         fields:"code,product_name,brands,serving_size,nutriments,nutrition_data_per"});
@@ -57,22 +78,10 @@ export function createProductSearch(fetchProducts = fetch, recoverConnection = p
       }
       if ([500,502,503,504].includes(response.status) && recentRequests.length < 10) {
         // The text index is served independently of the legacy search application.
-        const index = new URL("https://search.openfoodfacts.org/search");
-        index.search = new URLSearchParams({q:term,page_size:"16",fields:"code,product_name,brands"});
         recentRequests.push(Date.now());
-        const indexed = await fetchProducts(index, {signal:AbortSignal.timeout(12000),headers:{"User-Agent":userAgent}});
-        if (indexed.ok) {
-          const {hits} = await indexed.json();
-          if (Array.isArray(hits)) {
-            const foods = hits.filter(hit => /^\d{4,18}$/.test(hit?.code) && typeof hit.product_name === "string" && hit.product_name.trim())
-              .map(hit => ({barcode:String(hit.code),name:[String((Array.isArray(hit.brands) ? hit.brands[0] : hit.brands) || "").replace(/^[a-z]{2}:/,""),hit.product_name].filter(Boolean).join(" "),
-                source:"Open Food Facts",needsLabel:true}));
-            if (cache.size >= 100) cache.delete(cache.keys().next().value);
-            cache.set(term,{foods,time:Date.now()});
-            return foods;
-          }
-        }
-        response = indexed;
+        const foods = await searchIndex(term);
+        remember(foods);
+        return foods;
       }
       if (response.status === 429) throw failure("Open Food Facts is rate limiting searches. Try again in a minute.",429,"upstream-429");
       if (!response.ok) throw failure(`Open Food Facts returned HTTP ${response.status}. Saved and cached foods are still searchable.`,502,"upstream-" + response.status);
@@ -81,12 +90,11 @@ export function createProductSearch(fetchProducts = fetch, recoverConnection = p
       if (!Array.isArray(data?.products)) throw failure("Open Food Facts returned an unexpected product list.",502,"invalid-products");
       const products = data.products;
       const foods = products.map(labelFood).filter(Boolean);
-      if (cache.size >= 100) cache.delete(cache.keys().next().value);
-      cache.set(term,{foods,time:Date.now()});
+      remember(foods);
       return foods;
     })();
-    pending.set(term,request);
-    try {return await request;} finally {pending.delete(term);}
+    pending.set(key,request);
+    try {return await request;} finally {pending.delete(key);}
   };
 }
 

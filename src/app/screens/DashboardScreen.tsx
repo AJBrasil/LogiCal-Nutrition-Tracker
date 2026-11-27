@@ -220,6 +220,15 @@ export default function DashboardScreen({
   useEffect(() => () => activeSearch.current?.abort(), []);
   const [manualEntry, setManualEntry] = useState(false);
   const query = inputVal.trim();
+  const suggestionTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (query.length < 3 || showModal) return;
+    suggestionTimer.current = window.setTimeout(() => searchOpenFoods(true), 850);
+    return () => {
+      window.clearTimeout(suggestionTimer.current);
+      activeSearch.current?.abort();
+    };
+  }, [query, showModal]);
   useEffect(() => {
     if (!query || showModal) return;
     const controller = new AbortController();
@@ -277,18 +286,19 @@ export default function DashboardScreen({
     setShowModal(true);
   };
 
-  async function searchOpenFoods() {
+  async function searchOpenFoods(suggest = false) {
     if (!query) return;
+    window.clearTimeout(suggestionTimer.current);
     activeSearch.current?.abort();
     const controller = new AbortController();
     activeSearch.current = controller;
     setProducts({query,matches:[],loading:true,message:"Searching Open Food Facts…"});
     try {
-      const response = await fetch("/api/foods/products?q=" + encodeURIComponent(query), {signal:controller.signal});
+      const response = await fetch("/api/foods/products?q=" + encodeURIComponent(query) + (suggest ? "&mode=suggest" : ""), {signal:controller.signal});
       const data = await response.json();
       if (!response.ok || !Array.isArray(data)) throw Error(data.error || "Open Food Facts is unavailable.");
       if (!controller.signal.aborted) setProducts({query,matches:data,loading:false,
-        message:data.length ? "Open Food Facts products" : "No products with complete calorie and macro data found."});
+        message:data.length ? "Open Food Facts products" : "No matching Open Food Facts products."});
     } catch (error) {
       if (!controller.signal.aborted) setProducts({query,matches:[],loading:false,message:error.message || "Product search failed."});
     }
@@ -541,7 +551,7 @@ export default function DashboardScreen({
           </button>
         </div>
         {query && !showModal && <div className="food-results" aria-label="Food search results">
-          <button type="button" disabled={products?.loading} onClick={searchOpenFoods}>Search Open Food Facts</button>
+          {query.length < 3 && <p>Type at least 3 characters to search Open Food Facts.</p>}
           {products?.query === query && <><p role="status">{products.message}</p>
             {products.matches.map((food) => <button type="button" key={food.barcode} onClick={()=>openSearchResult(food)}>
               <span><strong>{food.name}</strong><small>{food.source} · {food.servingSize || "Packaged product"}</small></span><span>{food.needsLabel ? "View label" : food.calories+" kcal"}</span>
