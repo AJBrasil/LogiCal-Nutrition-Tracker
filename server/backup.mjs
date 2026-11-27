@@ -1,5 +1,5 @@
 import { DatabaseSync, backup } from "node:sqlite";
-import { statSync, renameSync, rmSync } from "node:fs";
+import { statSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 const source =
@@ -31,6 +31,9 @@ try {
     restored.close();
   }
   renameSync(tmp, output);
+  const status=source+".backup-status";
+  writeFileSync(status+"."+process.pid,new Date().toISOString());
+  renameSync(status+"."+process.pid,status);
 } finally {
   db.close();
   rmSync(tmp, { force: true });

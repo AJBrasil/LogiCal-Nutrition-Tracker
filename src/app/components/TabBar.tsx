@@ -1,4 +1,4 @@
-import { BarChart2, LayoutDashboard, Target } from "lucide-react";
+import { BookOpen, BarChart2, LayoutDashboard, Target } from "lucide-react";
 
 import type { Screen } from "../types";
 
@@ -9,7 +9,8 @@ interface TabBarProps {
 
 const tabs: { screen: Screen; label: string; Icon: typeof LayoutDashboard }[] = [
   { screen: "dashboard", label: "Log", Icon: LayoutDashboard },
-  { screen: "analytics", label: "Analytics", Icon: BarChart2 },
+  { screen:"foods",label:"Foods",Icon:BookOpen },
+  { screen: "analytics", label: "Progress", Icon: BarChart2 },
   { screen: "goals", label: "Goals", Icon: Target },
 ];
 

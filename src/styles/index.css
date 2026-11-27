@@ -39,3 +39,16 @@
 @media (min-width: 900px) {
   .entry-sheet { max-width: 36rem; align-self: center; }
 }
+.foods-page {padding:clamp(1rem,4vw,3rem);}
+.foods-page h1 {font-size:1.75rem;font-weight:650;margin:.5rem 0 1rem;}
+.nutrition-panel {background:var(--card);border:1px solid var(--border);border-radius:.85rem;padding:1rem;margin:.7rem 0;}
+.diary-meals .nutrition-panel {margin-inline:1rem;}
+.nutrition-panel h3 {font-size:1rem;font-weight:600;margin-bottom:.6rem;}
+.nutrition-panel p {font-size:.85rem;margin:.4rem 0;}
+.nutrition-fields {display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:.65rem;}
+.nutrition-actions {display:flex;align-items:center;flex-wrap:wrap;gap:.55rem;margin:.65rem 0;}
+.nutrition-actions button,.foods-page button {background:var(--muted);border-radius:.55rem;padding:.55rem .75rem;}
+.nutrition-actions button:disabled {opacity:.5;}
+.nutrition-fields input:not([type=checkbox]),.nutrition-actions input,.foods-page input,.foods-page select {background:var(--muted);border-radius:.4rem;padding:.45rem;max-width:100%;}
+.nutrition-fields label,.foods-page main label {display:block;}
+.nutrition-actions input[type=number] {width:6rem;}

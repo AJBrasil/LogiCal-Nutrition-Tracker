@@ -1,8 +1,11 @@
+import {scaleExtras,type Extras,type Nutrient} from "./nutrients.ts";
 
 import { serverMode, records, change, healthExports } from "./serverSync.ts";
 export type MealPeriod = "morning" | "afternoon" | "evening";
 
-export interface FoodEntry {
+export interface FoodEntry extends Extras {
+  grams?:number;
+  recipe?:{yield:number;items:{name:string;quantity:number}[]};
   id: number;
   name: string;
   calories: number;
@@ -20,6 +23,8 @@ export interface FoodEntry {
 export type Phase = "cut" | "recomp" | "bulk";
 
 export interface Targets {
+  optional?:Extras & {water?:number};
+  visible?: (Nutrient|"water")[];
   phase: Phase;
   weeklyRate: number;
   calories: number;
@@ -131,6 +136,7 @@ function normalizeEntry(value: unknown): FoodEntry | null {
 
   return {
     id: entry.id,
+    ...scaleExtras(entry), grams:entry.grams,recipe:entry.recipe,
     createdAt: entry.createdAt, alias: entry.alias,
     name: entry.name,
     calories: Number(entry.calories) || 0,
@@ -215,6 +221,7 @@ export function saveEntry(dateKey: string, entry: Omit<FoodEntry, "id">): FoodEn
     fat: Math.max(0, Number(entry.fat) || 0),
     time: entry.time,
     servingSize: entry.servingSize,
+    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe,
     barcode: entry.barcode,
     syncedToHealth: entry.syncedToHealth,
   };
@@ -392,7 +399,7 @@ export function getFavoriteMeals(): FoodEntry[] {
   }
 }
 
-export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">): FoodEntry {
+export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">, originalId?:number): FoodEntry {
   const favorites = getFavoriteMeals();
   const cleanName = (typeof entry.name === "string" ? entry.name.trim() : "") || "Favorite Meal";
 
@@ -407,12 +414,13 @@ export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">): FoodEntry {
     fat: Math.max(0, Number(entry.fat) || 0),
     time: entry.time,
     servingSize: entry.servingSize,
+    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe,
     barcode: entry.barcode,
   };
 
   if(serverMode) {
     const previous=favorites.find(f=>f.name.toLowerCase()===cleanName.toLowerCase());
-    newFav.id=previous?.id ?? newFav.id;newFav.alias=entry.alias;
+    newFav.id=originalId ?? previous?.id ?? newFav.id;newFav.alias=entry.alias;
     change([["favorite:"+newFav.id,newFav]]);return newFav;
   }
   const updated = [newFav, ...filtered];
@@ -471,6 +479,7 @@ export function getRecentMeals(limit: number = 8): FoodEntry[] {
 
 export interface UserDataBackup {
   exportHistory?: Record<string,string>;
+  measurements?:Record<string,number>;
   goalHistory?: Record<string,Targets>;
   version: number;
   exportedAt: string;
@@ -484,6 +493,7 @@ export function exportAllUserData(): UserDataBackup {
   return {
     version: 1,
     exportHistory: serverMode ? healthExports : undefined,
+    measurements:serverMode?Object.fromEntries(Object.entries(records()).filter(([k])=>/^(water|weight):/.test(k))):undefined,
     goalHistory: serverMode ? Object.fromEntries(Object.entries(records()).filter(([key])=>key.startsWith("goal:"))) : undefined,
     exportedAt: new Date().toISOString(),
     entries: getStorageMap(),
@@ -520,6 +530,7 @@ export function importUserDataJSON(jsonString: string): boolean {
       }
       for(const [key,goal] of batch) if(key.startsWith('goal:') &&
         (!goal || ['calories','protein','fat','carbs'].some(k=>!Number.isFinite(goal[k]) || goal[k]<0)))return false;
+      for(const [k,v] of Object.entries(data.measurements || {})){if(!/^(weight:\d{4}-\d{2}-\d{2}|water:\d{4}-\d{2}-\d{2}:[a-f0-9-]{36})$/.test(k)||typeof v!=='number'||!Number.isFinite(v)||v<=0)return false;batch.push([k,v]);}
       batch.push(['onboarded',true]);change(batch);return true;
     }
     if (data.entries && typeof data.entries === "object" && !Array.isArray(data.entries)) {

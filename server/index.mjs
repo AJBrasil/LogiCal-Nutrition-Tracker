@@ -1,5 +1,5 @@
 import http from "node:http";
-import { mkdirSync, existsSync, createReadStream, statSync } from "node:fs";
+import { mkdirSync, readFileSync, existsSync, createReadStream, statSync } from "node:fs";
 import { resolve, dirname, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -11,6 +11,11 @@ const path =
   resolve(homedir(), "Library/Application Support/LogiCal/nutrition.sqlite");
 mkdirSync(dirname(path), { recursive: true });
 const store = openStore(path);
+function snapshot(){
+  let lastBackup=null;
+  try{lastBackup=readFileSync(path+".backup-status","utf8").trim();}catch(e){if(e.code!=="ENOENT")throw e;}
+  return {records:store.read(),exports:store.status(),lastBackup};
+}
 const types = {
   ".html": "text/html",
   ".js": "text/javascript",
@@ -45,7 +50,7 @@ http
         return json(403, { error: "Use your authorized Tailscale identity" });
       if (url.pathname.startsWith("/api/")) {
         if (req.method === "GET" && url.pathname === "/api/state")
-          return json(200, { records: store.read(), exports: store.status() });
+          return json(200, snapshot());
         if (
           req.method !== "POST" ||
           req.headers["content-type"]?.split(";")[0] !== "application/json"
@@ -69,10 +74,7 @@ http
         switch (url.pathname) {
           case "/api/sync":
             store.apply(body);
-            return json(200, {
-              records: store.read(),
-              exports: store.status(),
-            });
+            return json(200,snapshot());
           case "/api/export":
             return json(200, store.reserve(body.meal, body.date));
           case "/api/confirm":

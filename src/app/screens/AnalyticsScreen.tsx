@@ -1,3 +1,4 @@
+import {WeightProgress} from "../components/NutritionDetails";
 import { useState } from "react";
 
 import TabBar from "../components/TabBar";
@@ -94,6 +95,7 @@ export default function AnalyticsScreen({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4" style={{ scrollbarWidth: "none" }}>
+        <WeightProgress days={daysCount}/>
         {/* Bar chart card */}
         <div
           className="rounded-2xl p-4 mb-3"

@@ -1,3 +1,4 @@
+import {OptionalGoals} from "../components/NutritionDetails";
 import {formatDateKey} from "../services/storageService";
 import { useState } from "react";
 import { Check } from "lucide-react";
@@ -28,6 +29,8 @@ export default function GoalsScreen({
   const [carbs, setCarbs] = useState(targets.carbs);
   const [fat, setFat] = useState(targets.fat);
   const [proteinLocked, setProteinLocked] = useState(targets.proteinLocked);
+  const [options,setOptions]=useState(targets.optional||{});
+  const [visible,setVisible]=useState<NonNullable<Targets["visible"]>>(targets.visible??["water"]);
   const [saved, setSaved] = useState(false);
 
   const [manual,setManual]=useState<string>(String(targets.calories));
@@ -62,7 +65,7 @@ export default function GoalsScreen({
       protein,
       carbs,
       fat,
-      proteinLocked,
+      proteinLocked,optional:options,visible,
     };
     onSaveTargets(updated,effective);
     setSaved(true);
@@ -91,6 +94,7 @@ export default function GoalsScreen({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4" style={{ scrollbarWidth: "none" }}>
+        <OptionalGoals options={options} visible={visible} setOptions={setOptions} setVisible={setVisible}/>
         <div className="flex flex-wrap gap-3 mb-4"><label>Daily kcal <input type="number" min="1" placeholder="Use phase target" value={manual} onChange={e=>setManual(e.target.value)}/></label><label>Effective from <input type="date" value={effective} onChange={e=>{if(e.target.value)setEffective(e.target.value)}}/></label></div>
         <div
           className="rounded-xl overflow-hidden mb-6"

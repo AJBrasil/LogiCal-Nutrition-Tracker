@@ -1,3 +1,5 @@
+import {getFavoriteMeals} from "../services/storageService";
+import type {ModalMacros} from "../types";
 import { useEffect, useRef, useState } from "react";
 import { X, Zap, RotateCw, Barcode, Check, Search, AlertCircle, Loader2 } from "lucide-react";
 import {
@@ -14,16 +16,8 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 interface BarcodeScannerModalProps {
   onClose: () => void;
-  onLogProduct: (entry: {
-    name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-    time: MealPeriod;
-    servingSize: string;
-    barcode: string;
-  }) => void;
+  library?:boolean;
+  onLogProduct:(entry:ModalMacros)=>void;
 }
 
 function confidenceDetails(confidence: ScannedProduct["confidence"]) {
@@ -50,7 +44,7 @@ function confidenceDetails(confidence: ScannedProduct["confidence"]) {
   };
 }
 
-export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeScannerModalProps) {
+export default function BarcodeScannerModal({ library=false,onClose, onLogProduct }: BarcodeScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -70,6 +64,7 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
   // Start camera stream
   useEffect(() => {
     let active = true;
+    let owned:MediaStream|undefined;
 
     async function startCamera() {
       setCameraError(null);
@@ -84,6 +79,7 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
           audio: false,
         });
 
+        owned=mediaStream;
         if (active) {
           setStream(mediaStream);
           if (videoRef.current) {
@@ -102,8 +98,8 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
 
     return () => {
       active = false;
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
+      if (owned) {
+        owned.getTracks().forEach((t) => t.stop());
       }
     };
   }, [facingMode]);
@@ -114,10 +110,14 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
 
     let scanInterval: ReturnType<typeof setInterval>;
 
+    let active=true;let detecting=false;
     const runScan = async () => {
+      if(detecting)return;
       if (videoRef.current && videoRef.current.readyState === 4) {
+        detecting=true;
         const detected = await scanVideoFrameWithBarcodeDetector(videoRef.current);
-        if (detected) {
+        detecting=false;
+        if (active && detected) {
           handleBarcodeDetected(detected);
         }
       }
@@ -125,7 +125,7 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
 
     scanInterval = setInterval(runScan, 400);
 
-    return () => clearInterval(scanInterval);
+    return () => {active=false;clearInterval(scanInterval);};
   }, [stream, product, loading]);
 
   const triggerHaptic = async () => {
@@ -136,11 +136,18 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
     }
   };
 
-  const handleBarcodeDetected = async (barcode: string) => {
+  const lookupRequest=useRef(0);
+  useEffect(()=>()=>{lookupRequest.current++;},[]);
+  const handleBarcodeDetected = async (raw: string) => {
+    const barcode=raw.trim();
+    if(!/^\d{8,14}$/.test(barcode)){setCameraError("Enter the 8–14 digits printed below the barcode.");return;}
+    const request=++lookupRequest.current;
     setLoading(true);
     triggerHaptic();
     try {
-      const p = await lookupBarcode(barcode);
+      const saved=getFavoriteMeals().find(f=>f.barcode?.replace(/^0+(?=.)/,"")===barcode.replace(/^0+(?=.)/,""));
+      const p:ScannedProduct=saved?{...saved,barcode,servingSize:saved.servingSize||"1 serving",servingWeightGrams:saved.grams,source:"local_database",confidence:"high"}:await lookupBarcode(barcode);
+      if(request!==lookupRequest.current)return;
       setProduct(p);
       setMultiplier(1);
       setServingInput("1");
@@ -148,7 +155,7 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
     } catch (err) {
       console.error("Barcode lookup failed", err);
     } finally {
-      setLoading(false);
+      if(request===lookupRequest.current)setLoading(false);
     }
   };
 
@@ -217,6 +224,7 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
     const scaled = scaleBarcodeNutrition(product, multiplier);
     triggerHaptic();
     onLogProduct({
+      ...scaled, grams:scaled.servingWeightGrams,
       name: product.name,
       calories: scaled.calories,
       protein: scaled.protein,
@@ -472,7 +480,7 @@ export default function BarcodeScannerModal({ onClose, onLogProduct }: BarcodeSc
                 className="flex-[2] py-3 rounded-xl bg-[#00D98A] text-black text-[13px] font-bold flex items-center justify-center gap-1.5 active:opacity-90"
               >
                 <Check size={16} />
-                Log to {mealPeriod}
+                {library?"Review food":"Review meal"}
               </button>
             </div>
                 </>

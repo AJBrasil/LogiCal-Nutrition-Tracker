@@ -1,3 +1,9 @@
+import {useState} from "react";
+import EntryModal from "./components/EntryModal";
+import type {ModalMacros} from "./types";
+import {scaleExtras} from "./services/nutrients";
+import FoodsScreen from "./screens/FoodsScreen";
+import {saveFavoriteMeal} from "./services/storageService";
 import { Toaster } from "sonner";
 
 import { parseFoodNaturalLanguage } from "./services/foodParserService";
@@ -17,6 +23,7 @@ import GoalsScreen from "./screens/GoalsScreen";
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const [scanDraft,setScanDraft]=useState<{food:ModalMacros;library:boolean}|null>(null);
   const {
     screen,
     setScreen,
@@ -70,6 +77,7 @@ export default function App() {
             />
           )}
 
+          {screen==="foods" && <FoodsScreen navigate={setScreen} scan={()=>setShowScanner(true)} log={handleLogEntry}/>}
           {screen === "goals" && (
             <GoalsScreen
               targets={targets}
@@ -90,20 +98,15 @@ export default function App() {
         {showScanner && (
           <BarcodeScannerModal
             onClose={() => setShowScanner(false)}
-            onLogProduct={(p) => {
-              handleLogEntry({
-                name: p.name,
-                calories: p.calories,
-                protein: p.protein,
-                carbs: p.carbs,
-                fat: p.fat,
-                time: p.time,
-                servingSize: p.servingSize,
-              });
-            }}
+            library={screen==="foods"}
+            onLogProduct={food=>setScanDraft({food,library:screen==="foods"})}
           />
         )}
 
+        {scanDraft && <EntryModal library={scanDraft.library} initialData={scanDraft.food} onClose={()=>setScanDraft(null)} onLog={food=>{
+          if(scanDraft.library)saveFavoriteMeal(food);else handleLogEntry(food);
+          setScanDraft(null);
+        }}/>}
         {showVoice && (
           <VoiceInputModal
             onClose={() => setShowVoice(false)}
@@ -112,6 +115,7 @@ export default function App() {
               const h = new Date().getHours();
               const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
               handleLogEntry({
+                ...scaleExtras(parsed),
                 name: parsed.name,
                 calories: parsed.calories,
                 protein: parsed.protein,

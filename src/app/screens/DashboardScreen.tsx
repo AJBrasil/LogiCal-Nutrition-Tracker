@@ -1,3 +1,5 @@
+import {scaleExtras} from "../services/nutrients";
+import {DiaryDetails} from "../components/NutritionDetails";
 import { change,syncLabel } from "../services/serverSync";
 import {formatDateKey,getEntriesForDate} from "../services/storageService";
 import {toast} from "sonner";
@@ -235,6 +237,7 @@ export default function DashboardScreen({
     const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
 
     setModalData({
+      ...scaleExtras(parsed),
       name: parsed.name,
       calories: parsed.calories,
       protein: parsed.protein,
@@ -263,6 +266,7 @@ export default function DashboardScreen({
     const h = new Date().getHours();
     const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
     setModalData({
+      ...item,
       name: item.name,
       calories: item.calories,
       protein: item.protein,
@@ -394,6 +398,7 @@ export default function DashboardScreen({
       </div>
 
       <div className="diary-meals flex-1 overflow-y-auto pb-2" style={{ scrollbarWidth: "none" }}>
+        <DiaryDetails date={dateKey} entries={entries} targets={targets}/>
         {entries.length === 0 ? (
           <div className="text-center py-12 px-6">
             <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3 text-muted-foreground">

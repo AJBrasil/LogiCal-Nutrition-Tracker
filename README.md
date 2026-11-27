@@ -48,3 +48,9 @@ In Shortcuts on the iPhone create a shortcut named **LogiCal Meal**. The app pas
 5. In LogiCal, open Settings → Preview meal exports, check the date and values, then tap Export meal. A confirmed meal is blocked from subsequent export. If the Shortcut stops partway through, review the samples in Health before releasing the meal for retry. Later corrections to an exported meal must also be made in Health.
 
 The daily CSV summarizes intake for spreadsheets. The JSON backup merges records by meal ID and date. The SQLite backup includes the full database and export ledger.
+
+## Diary, Foods and Progress
+
+Use **Foods** to save a nutrition label, UPC and reference weight, or combine saved foods into a recipe. Enter the ingredient quantities in servings and the batch yield to calculate nutrition per portion. The barcode scanner works from Foods and Log. Hold a retail barcode horizontally across the camera view. You can also enter its digits manually. Review the product and serving before saving it.
+
+**Goals → Daily tracking** controls which nutrient and hydration totals appear in the diary. Missing label values are displayed as unknown. A partial total covers only meals with a recorded value. Water uses milliliters and weigh-ins use pounds. **Progress** shows weekly average intake against the goals effective on logged dates, plus a seven-calendar-day average of recorded weights. **Settings** shows the last verified database snapshot and outstanding Apple Health exports.

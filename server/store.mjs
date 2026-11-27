@@ -63,7 +63,7 @@ export function openStore(path) {
               continue;
             }
             if (
-              !/^(meal:\d{4}-\d\d-\d\d:\d+|favorite:\d+|goal:\d{4}-\d\d-\d\d|settings|onboarded)$/.test(
+              !/^(meal:\d{4}-\d\d-\d\d:\d+|favorite:\d+|goal:\d{4}-\d\d-\d\d|weight:\d{4}-\d\d-\d\d|water:\d{4}-\d\d-\d\d:[a-f0-9-]{36}|settings|onboarded)$/.test(
                 key,
               )
             )
@@ -92,6 +92,7 @@ export function openStore(path) {
               )
             )
               throw Error("Invalid goal");
+            if(value!==null && /^(water|weight):/.test(key) && (!Number.isFinite(value)||value<=0)) throw Error("Invalid measurement");
             if (value === null)
               db.prepare("DELETE FROM records WHERE key=?").run(key);
             else

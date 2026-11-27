@@ -1,3 +1,5 @@
+import {ExtraFields} from "./NutritionDetails";
+import {scaleExtras} from "../services/nutrients";
 import { useState } from "react";
 import { Star } from "lucide-react";
 
@@ -12,12 +14,13 @@ const PERIOD_LABELS: { key: MealPeriod; label: string; hint: string }[] = [
 ];
 
 interface EntryModalProps {
+  library?:boolean;
   initialData: ModalMacros;
   onClose: () => void;
   onLog: (data: ModalMacros) => void;
 }
 
-export default function EntryModal({ initialData, onClose, onLog }: EntryModalProps) {
+export default function EntryModal({ library=false,initialData, onClose, onLog }: EntryModalProps) {
   const [data, setData] = useState<ModalMacros>(initialData);
   const [portions,setPortions]=useState("1");
   const [isFav, setIsFav] = useState<boolean>(() => isFavoriteMeal(initialData.name));
@@ -48,6 +51,7 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
                 Food Item
               </span>
               <button
+                hidden={library}
                 type="button"
                 onClick={() => setIsFav((prev) => !prev)}
                 className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-colors border"
@@ -118,6 +122,7 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
           <label className="block mb-2">Servings <input aria-label="Servings" type="number" step="any" min="0.01" value={portions} onChange={e=>{
             const value=e.target.value;setPortions(value);
             const n=Number(value);if(n>0) setData(prev=>({...prev,
+              ...scaleExtras(initialData,n), grams:initialData.grams?initialData.grams*n:undefined,
               calories:Math.round(initialData.calories*n),protein:Math.round(initialData.protein*n*10)/10,
               carbs:Math.round(initialData.carbs*n*10)/10,fat:Math.round(initialData.fat*n*10)/10,
               servingSize:n===1?initialData.servingSize:(initialData.servingSize || '1 serving').replace(/^(\d+(?:\.\d+)?(?:\/\d+)?)/,q=>{
@@ -126,7 +131,10 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
             }));
           }}/></label>
           <label>Reference portion <input placeholder="4 oz" value={data.servingSize || ''} onChange={e=>setData({...data,servingSize:e.target.value})}/></label>
-          {isFav && <label> Food alias <input placeholder="my usual chicken" value={data.alias || ''} onChange={e=>setData({...data,alias:e.target.value})}/></label>}
+          {library && <label>Barcode <input inputMode="numeric" value={data.barcode||""} onChange={e=>setData({...data,barcode:e.target.value.replace(/\D/g,"")})}/></label>}
+          <label>Grams per portion <input type="number" min="0" step="any" value={data.grams??""} onChange={e=>setData({...data,grams:Number(e.target.value)||undefined})}/></label>
+          <details><summary>Nutrition label details</summary><ExtraFields value={data} onChange={next=>setData({...data,...next})}/></details>
+          {(isFav || library) && <label> Food alias <input placeholder="my usual chicken" value={data.alias || ''} onChange={e=>setData({...data,alias:e.target.value})}/></label>}
           <div className="h-px bg-border mb-4" />
 
           <div className="flex items-baseline justify-between mb-3">
@@ -185,6 +193,7 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
             <button
               disabled={!data.name.trim() || Number(portions)<=0}
               onClick={() => {
+                if(library){onLog(data);return;}
                 if (isFav && data.name.trim()) {
                   saveFavoriteMeal(data);
                 } else {
@@ -196,7 +205,7 @@ export default function EntryModal({ initialData, onClose, onLog }: EntryModalPr
               className="flex-[2] py-3.5 rounded-xl text-[14px] font-medium transition-colors active:opacity-80"
               style={{ background: "#00D98A", color: "#0A0A0C", fontFamily: "Inter, sans-serif" }}
             >
-              {("id" in initialData) ? "Save to" : "Log to"} {PERIOD_LABELS.find((p) => p.key === data.time)?.label ?? data.time}
+              {library?"Save food":(("id" in initialData)?"Save to ":"Log to ")+(PERIOD_LABELS.find(p=>p.key===data.time)?.label??data.time)}
             </button>
           </div>
         </div>

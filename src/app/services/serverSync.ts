@@ -4,6 +4,7 @@ const cacheKey = "logical.server.snapshot";
 type Records = Record<string, any>;
 type Change = [string, any];
 type Mutation = { id: string; changes: Change[]; order: number };
+export let lastBackup:string|null=null;
 export let healthExports: Record<string, string> =
   typeof window === "undefined"
     ? {}
@@ -78,6 +79,7 @@ export async function refresh() {
       if (!data.records) throw Error("Missing server data");
       localStorage.setItem(cacheKey, JSON.stringify(data.records));
       healthExports = data.exports;
+      lastBackup=data.lastBackup??null;
       localStorage.setItem("logical.receipts", JSON.stringify(data.exports));
       for (const op of ops) localStorage.removeItem(prefix + op.id);
       online = true;

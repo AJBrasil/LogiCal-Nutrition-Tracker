@@ -86,3 +86,14 @@ test("upgrading clears the original quick meals once and preserves the diary", a
     rmSync(dir, {recursive:true, force:true});
   }
 });
+
+test("water additions and a corrected daily weigh-in survive replay",()=>{
+ const store=openStore(':memory:');
+ try{
+  const day='2026-11-26';const w1='water:'+day+':'+randomUUID(),w2='water:'+day+':'+randomUUID();
+  const op={id:randomUUID(),changes:[[w1,250],[w2,350],['weight:'+day,170]]};
+  store.apply([op]);store.apply([op]);store.apply([{id:randomUUID(),changes:[['weight:'+day,169.5]]}]);
+  assert.equal(store.read()[w1]+store.read()[w2],600);assert.equal(store.read()['weight:'+day],169.5);
+  assert.throws(()=>store.apply([{id:randomUUID(),changes:[[w1,-100]]}]));
+ }finally{store.db.close();}
+});

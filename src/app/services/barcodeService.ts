@@ -1,4 +1,6 @@
-export interface ScannedProduct {
+import {scanRetailFrame} from "./retailBarcode.ts";
+import {labelExtras,scaleExtras,type Extras} from "./nutrients.ts";
+export interface ScannedProduct extends Extras {
   barcode: string;
   name: string;
   brand?: string;
@@ -13,7 +15,7 @@ export interface ScannedProduct {
   confidence: "high" | "medium" | "fallback";
 }
 
-export interface ScaledBarcodeNutrition {
+export interface ScaledBarcodeNutrition extends Extras {
   calories: number;
   protein: number;
   carbs: number;
@@ -149,6 +151,7 @@ export function scaleBarcodeNutrition(product: ScannedProduct, multiplier: numbe
     : undefined;
 
   return {
+    ...scaleExtras(product,safeMultiplier),
     calories: Math.round(product.calories * safeMultiplier),
     protein: Math.round(product.protein * safeMultiplier),
     carbs: Math.round(product.carbs * safeMultiplier),
@@ -175,6 +178,7 @@ function normalizeCachedProduct(value: unknown): ScannedProduct | null {
   }
 
   return {
+    ...scaleExtras(product),
     barcode: product.barcode,
     name: product.name,
     brand: typeof product.brand === "string" ? product.brand : undefined,
@@ -288,12 +292,13 @@ export async function lookupBarcode(barcode: string): Promise<ScannedProduct> {
           n["carbohydrates_serving"] ||
           n["fat_serving"]
         );
-        const servingSize = p.serving_size || p.quantity || "1 serving";
+        const servingSize = p.serving_size || (servingWeightGrams ? servingWeightGrams+" g" : hasServingMacros ? "1 serving" : "100 g");
         const name = p.product_name || p.generic_name || `Scanned Item #${cleanCode}`;
         const brand = p.brands ? p.brands.split(",")[0].trim() : undefined;
         const imageUrl = p.image_front_url || p.image_small_url || localMatch?.imageUrl;
 
         const product: ScannedProduct = {
+          ...labelExtras(n,servingWeightGrams || (!hasServingMacros && !p.serving_size?100:undefined)),
           barcode: cleanCode,
           name: brand ? `${brand} ${name}` : name,
           brand,
@@ -359,7 +364,7 @@ export function hasBarcodeDetectorSupport(): boolean {
  * Scan video element with native BarcodeDetector if available
  */
 export async function scanVideoFrameWithBarcodeDetector(video: HTMLVideoElement): Promise<string | null> {
-  if (!hasBarcodeDetectorSupport()) return null;
+  if (!hasBarcodeDetectorSupport()) return scanRetailFrame(video);
   try {
     // @ts-expect-error - BarcodeDetector is a modern web standard
     const detector = new window.BarcodeDetector({
@@ -367,10 +372,11 @@ export async function scanVideoFrameWithBarcodeDetector(video: HTMLVideoElement)
     });
     const barcodes = await detector.detect(video);
     if (barcodes && barcodes.length > 0) {
-      return barcodes[0].rawValue;
+      const retail=barcodes.find((b:{rawValue:string})=>/^\d{8,14}$/.test(b.rawValue));
+      if(retail)return retail.rawValue;
     }
   } catch (err) {
     console.debug("BarcodeDetector frame detection:", err);
   }
-  return null;
+  return scanRetailFrame(video);
 }

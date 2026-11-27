@@ -7,7 +7,7 @@ import {
 } from "../services/storageService";
 import { exportAppleHealthCSV } from "../services/appleHealthService";
 import {
-  healthExports,
+  healthExports,lastBackup,records,
   post,
   refresh,
   syncLabel,
@@ -83,6 +83,11 @@ export default function ServerSettings({
         <h2>Settings</h2>
         <button onClick={close}>Done</button>
       </header>
+      <section className="nutrition-panel"><h3>Server status</h3><p>Connection · {syncLabel()}</p>
+        <p>Last verified database backup · {lastBackup?new Date(lastBackup).toLocaleString():"No successful backup reported"}</p>
+        <h3>Pending Apple Health exports</h3>{Object.values(healthExports).every(s=>s!=="pending") && <p>None pending</p>}
+        {Object.entries(healthExports).filter(([,s])=>s==="pending").map(([key])=><div key={key}><p>{key.split(":")[1]} · {records()[key]?.name || "Deleted meal"}</p><div className="nutrition-actions"><button onClick={()=>resolve(key,true)}>Mark written</button><button onClick={()=>resolve(key,false)}>Release for retry</button></div></div>)}
+      </section>
       <button onClick={setup}>Run goal setup</button>
       <h3>Data</h3>
       <div className="grid gap-3">

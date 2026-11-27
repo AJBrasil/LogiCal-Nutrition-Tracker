@@ -70,6 +70,7 @@ export function useNutritionState() {
 
   const handleLogEntry = (item: ModalMacros) => {
     const saved=saveEntry(dateKey, {
+      ...item,
       name: item.name,
       calories: item.calories,
       protein: item.protein,

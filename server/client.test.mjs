@@ -58,5 +58,18 @@ test("offline queue replays after lost acknowledgment and goals keep their effec
   await tick();
   assert.equal(data.getTargets("2026-11-26").calories, 2100);
   assert.equal(data.getTargets("2026-12-03").calories, 2500);
+  const waterKey="water:2026-11-26:"+crypto.randomUUID();
+  sync.change([[waterKey,250],["weight:2026-11-26",165]]);
+  const saved=data.saveFavoriteMeal({name:"Rice bowl",time:"afternoon",calories:300,protein:15,carbs:50,fat:5,fiber:4,sugar:0,grams:200,barcode:"012345678905"});
+  await tick();
+  const backup=data.exportAllUserDataJSON();
+  sync.change([[waterKey,null],["favorite:"+saved.id,null]]);
+  assert.equal(data.importUserDataJSON(backup),true);
+  await tick();
+  assert.equal(db.read()[waterKey],250);
+  const restored=db.read()["favorite:"+saved.id];
+  assert.equal(restored.sugar,0);
+  assert.equal(restored.grams,200);
+  assert.equal(restored.sodium,undefined);
   db.db.close();
 });

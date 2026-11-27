@@ -1,4 +1,5 @@
-export interface ParsedFoodResult {
+import {keys,scaleExtras,type Extras} from "./nutrients.ts";
+export interface ParsedFoodResult extends Extras {
   name: string;
   calories: number;
   protein: number;
@@ -88,7 +89,7 @@ function tryParseDirectMacros(input: string): ParsedFoodResult | null {
  * Parse natural language strings like:
  * "3 eggs and sourdough toast" or "chicken breast with rice"
  */
-export function parseFoodNaturalLanguage(input: string, favorites: {name:string;alias?:string;servingSize?:string;calories:number;protein:number;carbs:number;fat:number}[] = []): ParsedFoodResult {
+export function parseFoodNaturalLanguage(input: string, favorites: (Extras & {grams?:number;name:string;alias?:string;servingSize?:string;calories:number;protein:number;carbs:number;fat:number})[] = []): ParsedFoodResult {
   const trimmed = input.trim();
   if (!trimmed) {
     return {
@@ -116,6 +117,7 @@ export function parseFoodNaturalLanguage(input: string, favorites: {name:string;
   let totalProtein = 0;
   let totalCarbs = 0;
   let totalFat = 0;
+  const detailParts:Extras[]=[];
   const matchedNames: string[] = [];
 
   for (const seg of segments) {
@@ -126,7 +128,7 @@ export function parseFoodNaturalLanguage(input: string, favorites: {name:string;
       Math.max(...b.keywords.filter(k=>name.includes(k)).map(k=>k.length))-Math.max(...a.keywords.filter(k=>name.includes(k)).map(k=>k.length)))[0];
     const found = saved || food;
     if(found) {
-      const serving=saved?.servingSize || food?.defaultServing || '';
+      const serving=(saved?.grams && ["g","oz"].includes(amount?.[2]?.toLowerCase()||"") ? saved.grams+" g" : saved?.servingSize) || food?.defaultServing || '';
       let scale=amount ? Number(amount[1]) : 1;
       if(amount?.[2]) {
         const unit=amount[2].toLowerCase().replace(/cups?/, 'cup');
@@ -141,9 +143,11 @@ export function parseFoodNaturalLanguage(input: string, favorites: {name:string;
       totalProtein+=Math.round(scale*(saved?.protein ?? food.proteinPerUnit));
       totalCarbs+=Math.round(scale*(saved?.carbs ?? food.carbsPerUnit));
       totalFat+=Math.round(scale*(saved?.fat ?? food.fatPerUnit));
+      detailParts.push(scaleExtras(saved || {},scale));
       matchedNames.push(found.name);
     }
     if (!found) {
+      detailParts.push({});
       // Default estimation for unknown segment
       totalCalories += 150;
       totalProtein += 10;
@@ -161,6 +165,7 @@ export function parseFoodNaturalLanguage(input: string, favorites: {name:string;
     protein: totalProtein,
     carbs: totalCarbs,
     fat: totalFat,
+    ...Object.fromEntries(keys.filter(k=>detailParts.length && detailParts.every(p=>p[k]!=null)).map(k=>[k,detailParts.reduce((n,p)=>n+p[k]!,0)])),
     confidence: matchedNames.length > 0 ? "parsed_ingredients" : "fallback_estimate",
     ingredients: matchedNames,
   };

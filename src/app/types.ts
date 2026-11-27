@@ -1,8 +1,11 @@
 import type { MealPeriod } from "./services/storageService";
 
-export type Screen = "dashboard" | "goals" | "analytics";
+import type {Extras} from "./services/nutrients";
+export type Screen = "foods" | "dashboard" | "goals" | "analytics";
 
-export interface ModalMacros {
+export interface ModalMacros extends Extras {
+  barcode?:string;
+  grams?:number;
   name: string;
   calories: number;
   protein: number;

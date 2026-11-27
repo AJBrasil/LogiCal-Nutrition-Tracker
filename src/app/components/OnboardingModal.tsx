@@ -86,6 +86,7 @@ export default function OnboardingModal({
   const handleFinish = () => {
     triggerHaptic(ImpactStyle.Heavy);
     const configuredTargets: Targets = {
+      ...initialTargets,
       phase,
       weeklyRate,
       calories: baseCalories,
