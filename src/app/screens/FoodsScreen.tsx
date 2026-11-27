@@ -7,8 +7,9 @@ import {
   saveFavoriteMeal,
   removeFavoriteMeal,
   type FoodEntry,
+  type MealComponent,
 } from "../services/storageService";
-import { recipePortion } from "../services/nutrients";
+import { recipePortion,scaleExtras } from "../services/nutrients";
 import type { Screen, ModalMacros } from "../types";
 const empty: ModalMacros = {
   name: "",
@@ -31,37 +32,41 @@ export default function FoodsScreen({
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<ModalMacros | null>(null);
   const [editing, setEditing] = useState<number>();
-  const [recipe, setRecipe] = useState(false);
+  const [builder,setBuilder] = useState<"recipe"|"meal"|null>(null);
   const [name, setName] = useState("");
   const [yieldCount, setYield] = useState("4");
-  const [parts, setParts] = useState<{ id: number; quantity: number }[]>([]);
-  function saveRecipe() {
-    const ingredients = parts.map((i) => ({
-      food: foods.find((f) => f.id === i.id),
-      quantity: i.quantity,
-    }));
-    if (
-      !name.trim() ||
-      !ingredients.length ||
-      ingredients.some((i) => !i.food || i.quantity <= 0) ||
-      Number(yieldCount) <= 0
-    )
+  const [parts, setParts] = useState<MealComponent[]>([]);
+  const choices = foods.filter(food => !food.meal);
+  const isMeal = builder === "meal";
+  const yieldValue = isMeal ? 1 : Number(yieldCount);
+  const total = parts.length && parts.every(p=>Number.isFinite(p.quantity) && p.quantity > 0) && Number.isFinite(yieldValue) && yieldValue > 0
+    ? recipePortion(parts,yieldValue) : null;
+
+  function startBuilder(kind:"meal"|"recipe",existing?:FoodEntry) {
+    setEditing(existing?.id);
+    setName(existing?.name ?? "");
+    setParts(existing?.meal?.items ?? []);
+    setYield("4");
+    setBuilder(kind);
+  }
+
+  function component(food:FoodEntry):MealComponent["food"] {
+    const {id,name,servingSize,calories,protein,carbs,fat,grams} = food;
+    return {id,name,servingSize,calories,protein,carbs,fat,grams,...scaleExtras(food)};
+  }
+
+  function saveCombination() {
+    if (!total || !name.trim() || (isMeal && parts.length < 2)) return;
+    if (foods.some(food => food.id !== editing && food.name.toLowerCase() === name.trim().toLowerCase())) {
+      toast("That name is already in your library. Choose another name.");
       return;
-    const items = ingredients as { food: FoodEntry; quantity: number }[];
+    }
     saveFavoriteMeal({
-      ...recipePortion(items, Number(yieldCount)),
-      name: name.trim(),
-      time: "afternoon",
-      servingSize: "1 serving",
-      recipe: {
-        yield: Number(yieldCount),
-        items: items.map((i) => ({ name: i.food.name, quantity: i.quantity })),
-      },
-    });
-    setRecipe(false);
-    setParts([]);
-    setName("");
-    toast("Recipe saved");
+      ...total,name:name.trim(),time:"afternoon",servingSize:isMeal ? "1 meal" : "1 serving",
+      ...(isMeal ? {meal:{items:parts}} : {recipe:{yield:yieldValue,items:parts.map(p=>({name:p.food.name,quantity:p.quantity}))}}),
+    },editing);
+    setBuilder(null);
+    toast(isMeal ? "Meal saved" : "Recipe saved");
   }
   const matches = foods.filter((f) =>
     [f.name, f.alias, f.barcode].some((v) =>
@@ -76,34 +81,30 @@ export default function FoodsScreen({
           <button
             onClick={() => {
               setEditing(undefined);
+              setBuilder(null);
               setDraft(empty);
             }}
           >
             Add food
           </button>
           <button onClick={scan}>Scan barcode</button>
-          <button disabled={!foods.length} onClick={() => setRecipe(!recipe)}>
-            Build recipe
-          </button>
+          <button onClick={()=>startBuilder("recipe")}>Add Recipe</button>
+          <button onClick={()=>startBuilder("meal")}>Add Meal</button>
         </div>
-        {recipe && (
-          <form
-            className="nutrition-panel"
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveRecipe();
-            }}
-          >
-            <h3>Batch recipe</h3>
+        {builder && (
+          <form className="nutrition-panel" onSubmit={e=>{e.preventDefault(); saveCombination();}}>
+            <h3>{isMeal ? "Meal" : "Batch recipe"}</h3>
+            <p>{isMeal ? "Combine foods you eat together. Log the whole meal in one step." : "Combine ingredients and enter how many servings the batch makes."}</p>
+            {!choices.length && <p>Add a food to your library to get started.</p>}
             <label>
-              Recipe name
+              {isMeal ? "Meal name" : "Recipe name"}
               <input
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
-            <label>
+            {!isMeal && <label>
               Batch yield (servings)
               <input
                 required
@@ -113,23 +114,24 @@ export default function FoodsScreen({
                 value={yieldCount}
                 onChange={(e) => setYield(e.target.value)}
               />
-            </label>
+            </label>}
             {parts.map((v, index) => (
               <div className="nutrition-actions" key={index}>
                 <select
-                  aria-label="Ingredient"
-                  value={v.id}
+                  aria-label={isMeal ? "Food item" : "Ingredient"}
+                  value={v.food.id}
                   onChange={(e) =>
                     setParts(
                       parts.map((p, i) =>
-                        i === index ? { ...p, id: Number(e.target.value) } : p,
+                        i === index ? { ...p, food: component(choices.find(f=>f.id===Number(e.target.value))!) } : p,
                       ),
                     )
                   }
                 >
-                  {foods.map((f) => (
+                  {!choices.some(f=>f.id===v.food.id) && <option value={v.food.id}>{v.food.name}</option>}
+                  {choices.map((f) => (
                     <option key={f.id} value={f.id}>
-                      {f.name}
+                      {f.name} · {f.servingSize || "1 serving"}
                     </option>
                   ))}
                 </select>
@@ -163,18 +165,21 @@ export default function FoodsScreen({
             <div className="nutrition-actions">
               <button
                 type="button"
+                disabled={!choices.length}
                 onClick={() =>
-                  setParts([...parts, { id: foods[0].id, quantity: 1 }])
+                  setParts([...parts, { food:component(choices.find(f=>!parts.some(p=>p.food.id===f.id)) || choices[0]), quantity: 1 }])
                 }
               >
-                Add ingredient
+                {isMeal ? "Add food item" : "Add ingredient"}
               </button>
-              <button disabled={!parts.length}>Save recipe</button>
+              <button disabled={!name.trim() || !total || (isMeal && parts.length < 2)}>{isMeal ? "Save meal" : "Save recipe"}</button>
+              <button type="button" onClick={()=>setBuilder(null)}>Cancel</button>
             </div>
+            {total && <p>{isMeal ? "Whole meal" : "Per recipe serving"} · {total.calories} kcal · {total.protein} g protein · {total.carbs} g carbs · {total.fat} g fat</p>}
           </form>
         )}
         <label>
-          Search foods and recipes
+          Search foods, recipes, and meals
           <input
             type="search"
             value={search}
@@ -189,6 +194,9 @@ export default function FoodsScreen({
               {f.servingSize || "1 serving"}
               {f.grams ? " · " + f.grams + " g" : ""}
             </p>
+            {f.meal && <details><summary>Meal · {f.meal.items.length} food items</summary>
+              {f.meal.items.map((item,i)=><p key={i}>{item.quantity} × {item.food.name} · {item.food.servingSize || "1 serving"}</p>)}
+            </details>}
             {f.recipe && (
               <details>
                 <summary>Batch of {f.recipe.yield} servings</summary>
@@ -213,10 +221,12 @@ export default function FoodsScreen({
                   })
                 }
               >
-                Log serving
+                {f.meal ? "Log meal" : "Log serving"}
               </button>
               <button
                 onClick={() => {
+                  if (f.meal) {startBuilder("meal",f);return;}
+                  setBuilder(null);
                   setEditing(f.id);
                   setDraft(f);
                 }}
@@ -235,7 +245,7 @@ export default function FoodsScreen({
           </article>
         ))}
         {foods.length > 0 && !matches.length && (
-          <p>No matching foods or recipes.</p>
+          <p>No matching foods, recipes, or meals.</p>
         )}
         {!foods.length && (
           <p>Save a food label or scan a package to start your library.</p>

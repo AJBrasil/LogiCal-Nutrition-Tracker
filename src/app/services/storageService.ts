@@ -4,7 +4,13 @@ import {scaleExtras,type Extras,type Nutrient} from "./nutrients.ts";
 import { serverMode, records, change, healthExports } from "./serverSync.ts";
 export type MealPeriod = "morning" | "afternoon" | "evening";
 
+export interface MealComponent {
+  food: Extras & {id:number; name:string; servingSize?:string; grams?:number; calories:number; protein:number; carbs:number; fat:number};
+  quantity:number;
+}
+
 export interface FoodEntry extends Extras, PortionInfo {
+  meal?:{items:MealComponent[]};
   grams?:number;
   recipe?:{yield:number;items:{name:string;quantity:number}[]};
   id: number;
@@ -137,7 +143,7 @@ function normalizeEntry(value: unknown): FoodEntry | null {
 
   return {
     id: entry.id,
-    ...scaleExtras(entry), grams:entry.grams,recipe:entry.recipe, servings:entry.servings, perServing:entry.perServing, fdcId:entry.fdcId, portions:entry.portions,
+    ...scaleExtras(entry), grams:entry.grams,recipe:entry.recipe, meal:entry.meal, servings:entry.servings, perServing:entry.perServing, fdcId:entry.fdcId, portions:entry.portions,
     createdAt: entry.createdAt, alias: entry.alias,
     name: entry.name,
     calories: Number(entry.calories) || 0,
@@ -222,7 +228,7 @@ export function saveEntry(dateKey: string, entry: Omit<FoodEntry, "id">): FoodEn
     fat: Math.max(0, Number(entry.fat) || 0),
     time: entry.time,
     servingSize: entry.servingSize,
-    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe, servings:entry.servings, perServing:entry.perServing, fdcId:entry.fdcId, portions:entry.portions,
+    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe, meal:entry.meal, servings:entry.servings, perServing:entry.perServing, fdcId:entry.fdcId, portions:entry.portions,
     barcode: entry.barcode,
     syncedToHealth: entry.syncedToHealth,
   };
@@ -404,10 +410,10 @@ export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">, originalId?:numbe
   const favorites = getFavoriteMeals();
   const cleanName = (typeof entry.name === "string" ? entry.name.trim() : "") || "Favorite Meal";
 
-  const filtered = favorites.filter((f) => f.name.toLowerCase() !== cleanName.toLowerCase());
+  const filtered = favorites.filter((f) => f.id !== originalId && f.name.toLowerCase() !== cleanName.toLowerCase());
 
   const newFav: FoodEntry = {
-    id: Date.now() + Math.floor(Math.random() * 1000),
+    id: originalId ?? Date.now() + Math.floor(Math.random() * 1000),
     name: cleanName,
     calories: Math.max(0, Number(entry.calories) || 0),
     protein: Math.max(0, Number(entry.protein) || 0),
@@ -415,7 +421,7 @@ export function saveFavoriteMeal(entry: Omit<FoodEntry, "id">, originalId?:numbe
     fat: Math.max(0, Number(entry.fat) || 0),
     time: entry.time,
     servingSize: entry.servingSize,
-    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe, servings:entry.servings, perServing:entry.perServing, fdcId:entry.fdcId, portions:entry.portions,
+    ...scaleExtras(entry),grams:entry.grams,recipe:entry.recipe, meal:entry.meal, servings:entry.servings, perServing:entry.perServing, fdcId:entry.fdcId, portions:entry.portions,
     barcode: entry.barcode,
   };
 

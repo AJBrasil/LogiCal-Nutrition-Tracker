@@ -8,6 +8,7 @@ import {
   getEntriesForDate,
   resetAllData,
   saveEntry,
+  getFavoriteMeals, saveFavoriteMeal, removeFavoriteMeal,
 } from "./storageService.ts";
 
 class MemoryStorage {
@@ -124,4 +125,21 @@ test("USDA gram and household measures persist with the consumed nutrients", () 
   assert.equal(restored.fdcId,123);
   assert.deepEqual(restored.portions,rice.portions);
   assert.equal(forServings(changePortionWeight(base,1),150).calories,195);
+});
+
+test("saved meals retain item portions when logged or when a source food is removed", () => {
+  storage.clear();
+  const food = saveFavoriteMeal({name:"Toast",calories:100,protein:3,carbs:18,fat:1,time:"morning"});
+  const egg = saveFavoriteMeal({...food,name:"Egg",calories:70});
+  const items = [{food,quantity:1.5},{food:egg,quantity:1}];
+  const meal = saveFavoriteMeal({...food,name:"Breakfast",calories:220,meal:{items},servingSize:"1 meal"});
+  removeFavoriteMeal(food.id);
+  const restored = getFavoriteMeals().find(f=>f.id===meal.id)!;
+  saveEntry("2026-11-28",restored);
+  const logged = getEntriesForDate("2026-11-28")[0];
+  assert.equal(logged.calories,220);
+  assert.equal(logged.meal.items[0].quantity,1.5);
+  assert.equal(logged.meal.items[0].food.name,"Toast");
+  saveFavoriteMeal({...restored,name:"Weekend breakfast"},restored.id);
+  assert.equal(getFavoriteMeals().filter(f=>f.meal).length,1);
 });

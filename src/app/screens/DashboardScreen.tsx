@@ -578,7 +578,7 @@ export default function DashboardScreen({
             </button>)}
             <a href="https://openfoodfacts.org" target="_blank" rel="noreferrer" className="px-3 underline text-xs">Data from Open Food Facts (ODbL)</a>
           </section>}
-          <button type="button" onClick={()=>handleInputSubmit(query)}>Review typed entry</button>
+          <button type="button" onClick={()=>handleInputSubmit(query)}><span><strong>Quick Add</strong><small>Create an editable entry from “{query}”</small></span></button>
         </div>}
       </div>
 
