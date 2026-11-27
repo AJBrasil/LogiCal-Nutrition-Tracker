@@ -1,4 +1,3 @@
-import commonFoods from "../src/app/services/commonFoods.json" with { type: "json" };
 import defaultFavorites from "../src/app/services/defaultFavorites.json" with { type: "json" };
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
@@ -29,20 +28,15 @@ export function openStore(path) {
       }
     }
   });
-  db.exec("CREATE TEMP TABLE catalog (value TEXT, keywords TEXT)");
-  const insertFood = db.prepare("INSERT INTO catalog VALUES (?, ?)");
-  for (const food of commonFoods) {
-    const value = {name:food.name, servingSize:food.defaultServing, calories:food.caloriesPerUnit,
-      protein:food.proteinPerUnit, carbs:food.carbsPerUnit, fat:food.fatPerUnit};
-    insertFood.run(JSON.stringify(value), food.keywords.join("|"));
-  }
+  db.exec("CREATE TABLE IF NOT EXISTS product_cache (barcode TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  const cacheProduct = db.prepare("INSERT OR REPLACE INTO product_cache VALUES (?, ?)");
   const search = db.prepare(`
     WITH foods(value, keywords, source, priority, recordKey) AS (
       SELECT value, coalesce(json_extract(value,'$.alias'), ''),
         CASE WHEN key GLOB 'favorite:*' THEN 'Saved food' ELSE 'Diary' END,
         CASE WHEN key GLOB 'favorite:*' THEN 1 ELSE 2 END, key
       FROM records WHERE key GLOB 'favorite:*' OR key GLOB 'meal:*'
-      UNION ALL SELECT value, keywords, 'Reference food', 3, '' FROM catalog
+      UNION ALL SELECT value, barcode, 'Open Food Facts', 3, barcode FROM product_cache
     ), matches AS (
       SELECT *, lower(json_extract(value,'$.name')) AS name FROM foods
       WHERE instr(lower(json_extract(value,'$.name')), ?) OR instr(lower(keywords), ?)
@@ -52,6 +46,9 @@ export function openStore(path) {
       ORDER BY (name=? OR instr('|' || lower(keywords) || '|', '|' || ? || '|')>0) DESC, priority, name LIMIT 8`);
   return {
     db,
+    cacheProducts(foods) {
+      transaction(() => {for (const food of foods) cacheProduct.run(food.barcode, JSON.stringify(food));});
+    },
     searchFoods(query) {
       const term = query.trim().toLowerCase();
       if (!term || term.length > 160) return [];

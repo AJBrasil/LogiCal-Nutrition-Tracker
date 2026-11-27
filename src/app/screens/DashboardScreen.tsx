@@ -215,7 +215,9 @@ export default function DashboardScreen({
   const [inputVal, setInputVal] = useState(()=>localStorage.getItem("logical.draft") || "");
   type SearchMatch = Omit<ModalMacros, "time"> & {source:string};
   const [preview, setPreview] = useState<{query:string; matches:SearchMatch[]; failed:boolean} | null>(null);
-  const pendingEnter = useRef(false);
+  const activeSearch = useRef<AbortController | null>(null);
+  const [products, setProducts] = useState<{query:string; matches:SearchMatch[]; loading:boolean; message:string} | null>(null);
+  useEffect(() => () => activeSearch.current?.abort(), []);
   const [manualEntry, setManualEntry] = useState(false);
   const query = inputVal.trim();
   useEffect(() => {
@@ -235,10 +237,6 @@ export default function DashboardScreen({
       }
       if (controller.signal.aborted) return;
       setPreview({query, matches, failed});
-      if (pendingEnter.current) {
-        pendingEnter.current = false;
-        reviewFirstMatch(matches);
-      }
     }, 220);
     return () => {clearTimeout(timer); controller.abort();};
   }, [query, showModal]);
@@ -279,19 +277,22 @@ export default function DashboardScreen({
     setShowModal(true);
   };
 
-  function reviewFirstMatch(matches:SearchMatch[]) {
-    if (matches.length) {
-      const {source, ...food} = matches[0];
-      handleQuickSelect(food);
-    } else handleInputSubmit(query);
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      if (results) reviewFirstMatch(results.matches);
-      else pendingEnter.current = Boolean(query);
+  async function searchOpenFoods() {
+    if (!query) return;
+    activeSearch.current?.abort();
+    const controller = new AbortController();
+    activeSearch.current = controller;
+    setProducts({query,matches:[],loading:true,message:"Searching Open Food Facts…"});
+    try {
+      const response = await fetch("/api/foods/products?q=" + encodeURIComponent(query), {signal:controller.signal});
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) throw Error(data.error || "Open Food Facts is unavailable.");
+      if (!controller.signal.aborted) setProducts({query,matches:data,loading:false,
+        message:data.length ? "Open Food Facts products" : "No products with complete calorie and macro data found."});
+    } catch (error) {
+      if (!controller.signal.aborted) setProducts({query,matches:[],loading:false,message:error.message || "Product search failed."});
     }
-  };
+  }
 
   const favorites = getFavoriteMeals();
   const recents = getRecentMeals(4);
@@ -496,9 +497,9 @@ export default function DashboardScreen({
           <input
             aria-label="Search for food"
             value={inputVal}
-            onChange={(e) => {pendingEnter.current=false;setInputVal(e.target.value);localStorage.setItem("logical.draft",e.target.value);}}
-            onKeyDown={handleKeyDown}
-            placeholder="Type '3 eggs and sourdough toast' or quick-add..."
+            onChange={(e) => {activeSearch.current?.abort();setProducts(null);setInputVal(e.target.value);localStorage.setItem("logical.draft",e.target.value);}}
+            onKeyDown={e => {if (e.key === "Enter" && !e.nativeEvent.isComposing) {e.preventDefault();void searchOpenFoods();}}}
+            placeholder="Search foods or brands…"
             className="flex-1 bg-transparent text-foreground text-[13px] outline-none placeholder:text-muted-foreground min-w-0"
             style={{ fontFamily: "Inter, sans-serif" }}
           />
@@ -518,13 +519,20 @@ export default function DashboardScreen({
           </button>
         </div>
         {query && !showModal && <div className="food-results" aria-label="Food search results">
+          <button type="button" disabled={products?.loading} onClick={searchOpenFoods}>Search Open Food Facts</button>
+          {products?.query === query && <><p role="status">{products.message}</p>
+            {products.matches.map(({source, ...food}) => <button type="button" key={food.barcode} onClick={()=>handleQuickSelect(food)}>
+              <span><strong>{food.name}</strong><small>{source} · {food.servingSize}</small></span><span>{food.calories} kcal</span>
+            </button>)}
+            {products.matches.length > 0 && <a href="https://openfoodfacts.org" target="_blank" rel="noreferrer" className="px-3 underline text-xs">Data from Open Food Facts (ODbL)</a>}
+          </>}
           <p role="status">{!results ? "Searching foods…" : results.failed ? "Database unavailable. You can still enter a meal." :
-            results.matches.length ? "Matching foods" : "No matching food in your database."}</p>
-          {results?.matches.map(({source, ...food}) => <button type="button" key={food.name} onClick={()=>handleQuickSelect(food)}>
+            results.matches.length ? "Saved, recent and cached matches" : "No local matches."}</p>
+          {results?.matches.filter(food => !food.barcode || !products?.matches.some(p => p.barcode === food.barcode)).map(({source, ...food}) => <button type="button" key={food.name} onClick={()=>handleQuickSelect(food)}>
             <span><strong>{food.name}</strong><small>{source} · {food.servingSize || "1 logged portion"}</small></span>
             <span>{food.calories} kcal</span>
           </button>)}
-          <button type="button" onClick={()=>{pendingEnter.current=false;handleInputSubmit(query);}}>Review typed entry</button>
+          <button type="button" onClick={()=>handleInputSubmit(query)}>Review typed entry</button>
         </div>}
       </div>
 

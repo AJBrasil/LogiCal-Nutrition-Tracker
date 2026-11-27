@@ -98,7 +98,7 @@ test("water additions and a corrected daily weigh-in survive replay",()=>{
  }finally{store.db.close();}
 });
 
-test("food search reads live SQLite rows, aliases and the reference catalog", () => {
+test("food search reads live SQLite rows, aliases and cached Open Food Facts products", () => {
   const store = openStore(":memory:");
   try {
     const food = {id:7, name:"House stew", alias:"usual lunch", calories:410, protein:20, carbs:40, fat:12,time:"afternoon"};
@@ -107,7 +107,8 @@ test("food search reads live SQLite rows, aliases and the reference catalog", ()
     assert.deepEqual(store.searchFoods(" USUAL ").map(x => [x.name,x.source,x.calories]), [["House stew","Saved food",420]]);
     update([["favorite:7",null]]);
     assert.equal(store.searchFoods("stew")[0].source,"Diary");
-    assert.equal(store.searchFoods("ban")[0].name,"Fresh Banana");
+    store.cacheProducts([{...food, barcode:"123", name:"Banana yogurt"}]);
+    assert.equal(store.searchFoods("ban")[0].source,"Open Food Facts");
     assert.deepEqual(store.searchFoods("_"),[]);
     assert.deepEqual(store.searchFoods("no such food"),[]);
   } finally {store.db.close();}

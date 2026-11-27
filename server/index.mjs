@@ -1,3 +1,4 @@
+import {createProductSearch} from "./openFoodFacts.mjs";
 import http from "node:http";
 import { mkdirSync, readFileSync, existsSync, createReadStream, statSync } from "node:fs";
 import { resolve, dirname, extname, sep } from "node:path";
@@ -11,6 +12,7 @@ const path =
   resolve(homedir(), "Library/Application Support/LogiCal/nutrition.sqlite");
 mkdirSync(dirname(path), { recursive: true });
 const store = openStore(path);
+const searchProducts = createProductSearch();
 function snapshot(){
   let lastBackup=null;
   try{lastBackup=readFileSync(path+".backup-status","utf8").trim();}catch(e){if(e.code!=="ENOENT")throw e;}
@@ -49,6 +51,18 @@ http
       )
         return json(403, { error: "Use your authorized Tailscale identity" });
       if (url.pathname.startsWith("/api/")) {
+        if (req.method === "GET" && url.pathname === "/api/foods/products") {
+          try {
+            const foods = await searchProducts(url.searchParams.get("q") || "");
+            store.cacheProducts(foods);
+            console.info("GET /api/foods/products openfoodfacts matches=%d", foods.length);
+            return json(200, foods);
+          } catch (error) {
+            const status = error.status || 502;
+            console.warn("GET /api/foods/products status=%d",status);
+            return json(status, {error:error.status ? error.message : "Open Food Facts is unavailable. Try again shortly."});
+          }
+        }
         if (req.method === "GET" && url.pathname === "/api/foods/search") {
           const start = performance.now();
           const matches = store.searchFoods(url.searchParams.get("q") || "");
