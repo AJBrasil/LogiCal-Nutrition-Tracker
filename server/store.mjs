@@ -1,3 +1,4 @@
+import commonFoods from "../src/app/services/commonFoods.json" with { type: "json" };
 import defaultFavorites from "../src/app/services/defaultFavorites.json" with { type: "json" };
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
@@ -28,8 +29,37 @@ export function openStore(path) {
       }
     }
   });
+  db.exec("CREATE TEMP TABLE catalog (value TEXT, keywords TEXT)");
+  const insertFood = db.prepare("INSERT INTO catalog VALUES (?, ?)");
+  for (const food of commonFoods) {
+    const value = {name:food.name, servingSize:food.defaultServing, calories:food.caloriesPerUnit,
+      protein:food.proteinPerUnit, carbs:food.carbsPerUnit, fat:food.fatPerUnit};
+    insertFood.run(JSON.stringify(value), food.keywords.join("|"));
+  }
+  const search = db.prepare(`
+    WITH foods(value, keywords, source, priority, recordKey) AS (
+      SELECT value, coalesce(json_extract(value,'$.alias'), ''),
+        CASE WHEN key GLOB 'favorite:*' THEN 'Saved food' ELSE 'Diary' END,
+        CASE WHEN key GLOB 'favorite:*' THEN 1 ELSE 2 END, key
+      FROM records WHERE key GLOB 'favorite:*' OR key GLOB 'meal:*'
+      UNION ALL SELECT value, keywords, 'Reference food', 3, '' FROM catalog
+    ), matches AS (
+      SELECT *, lower(json_extract(value,'$.name')) AS name FROM foods
+      WHERE instr(lower(json_extract(value,'$.name')), ?) OR instr(lower(keywords), ?)
+    ), ranked AS (
+      SELECT *, row_number() OVER (PARTITION BY name ORDER BY priority, recordKey DESC) AS copy FROM matches
+    ) SELECT value, source FROM ranked WHERE copy=1
+      ORDER BY (name=? OR instr('|' || lower(keywords) || '|', '|' || ? || '|')>0) DESC, priority, name LIMIT 8`);
   return {
     db,
+    searchFoods(query) {
+      const term = query.trim().toLowerCase();
+      if (!term || term.length > 160) return [];
+      return search.all(term, term, term, term).map(row => {
+        const {id, createdAt, syncedToHealth, time, ...food} = JSON.parse(row.value);
+        return {...food, source:row.source};
+      });
+    },
     read: () =>
       Object.fromEntries(
         db

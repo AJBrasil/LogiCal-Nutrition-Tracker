@@ -1,3 +1,4 @@
+import COMMON_FOODS from "./commonFoods.json" with {type:"json"};
 import {keys,scaleExtras,type Extras} from "./nutrients.ts";
 export interface ParsedFoodResult extends Extras {
   name: string;
@@ -5,41 +6,9 @@ export interface ParsedFoodResult extends Extras {
   protein: number;
   carbs: number;
   fat: number;
-  confidence: "exact_macros" | "parsed_ingredients" | "fallback_estimate";
+  confidence: "exact_macros" | "parsed_ingredients" | "unmatched";
   ingredients?: string[];
 }
-
-interface FoodDatabaseItem {
-  keywords: string[];
-  name: string;
-  defaultServing: string;
-  caloriesPerUnit: number;
-  proteinPerUnit: number;
-  carbsPerUnit: number;
-  fatPerUnit: number;
-}
-
-const COMMON_FOODS: FoodDatabaseItem[] = [
-  { keywords: ["egg", "eggs"], name: "Large Egg", defaultServing: "1 egg", caloriesPerUnit: 70, proteinPerUnit: 6, carbsPerUnit: 0.5, fatPerUnit: 5 },
-  { keywords: ["egg white", "egg whites"], name: "Egg Whites", defaultServing: "1/4 cup (60g)", caloriesPerUnit: 35, proteinPerUnit: 8, carbsPerUnit: 0.5, fatPerUnit: 0 },
-  { keywords: ["sourdough", "toast", "bread", "slice of bread"], name: "Sourdough Toast", defaultServing: "1 slice (45g)", caloriesPerUnit: 120, proteinPerUnit: 4, carbsPerUnit: 24, fatPerUnit: 1 },
-  { keywords: ["chicken", "chicken breast"], name: "Chicken Breast, grilled", defaultServing: "4 oz", caloriesPerUnit: 185, proteinPerUnit: 35, carbsPerUnit: 0, fatPerUnit: 4 },
-  { keywords: ["rice", "brown rice", "white rice", "jasmine rice"], name: "Cooked Rice", defaultServing: "1 cup", caloriesPerUnit: 215, proteinPerUnit: 4.5, carbsPerUnit: 45, fatPerUnit: 1.5 },
-  { keywords: ["salmon", "salmon fillet"], name: "Atlantic Salmon, baked", defaultServing: "5 oz", caloriesPerUnit: 290, proteinPerUnit: 40, carbsPerUnit: 0, fatPerUnit: 14 },
-  { keywords: ["steak", "beef", "sirloin", "ground beef"], name: "Lean Sirloin Steak", defaultServing: "5 oz", caloriesPerUnit: 280, proteinPerUnit: 42, carbsPerUnit: 0, fatPerUnit: 12 },
-  { keywords: ["sweet potato", "potato", "baked potato"], name: "Baked Sweet Potato", defaultServing: "1 medium (130g)", caloriesPerUnit: 115, proteinPerUnit: 2, carbsPerUnit: 27, fatPerUnit: 0.2 },
-  { keywords: ["broccoli", "steamed broccoli"], name: "Steamed Broccoli", defaultServing: "1 cup", caloriesPerUnit: 50, proteinPerUnit: 4, carbsPerUnit: 10, fatPerUnit: 0.5 },
-  { keywords: ["avocado"], name: "Avocado", defaultServing: "1/2 avocado", caloriesPerUnit: 160, proteinPerUnit: 2, carbsPerUnit: 8, fatPerUnit: 15 },
-  { keywords: ["greek yogurt", "yogurt", "fage"], name: "Greek Yogurt (Plain 2%)", defaultServing: "1 cup (170g)", caloriesPerUnit: 140, proteinPerUnit: 18, carbsPerUnit: 6, fatPerUnit: 4 },
-  { keywords: ["protein shake", "whey", "protein powder"], name: "Whey Protein Shake", defaultServing: "1 scoop in water", caloriesPerUnit: 130, proteinPerUnit: 25, carbsPerUnit: 3, fatPerUnit: 1.5 },
-  { keywords: ["oatmeal", "oats", "rolled oats"], name: "Rolled Oatmeal", defaultServing: "1/2 cup dry (40g)", caloriesPerUnit: 150, proteinPerUnit: 5, carbsPerUnit: 27, fatPerUnit: 3 },
-  { keywords: ["banana"], name: "Fresh Banana", defaultServing: "1 medium", caloriesPerUnit: 105, proteinPerUnit: 1.3, carbsPerUnit: 27, fatPerUnit: 0.3 },
-  { keywords: ["apple"], name: "Fresh Apple", defaultServing: "1 medium", caloriesPerUnit: 95, proteinPerUnit: 0.5, carbsPerUnit: 25, fatPerUnit: 0.3 },
-  { keywords: ["peanut butter", "almond butter"], name: "Peanut Butter", defaultServing: "2 tbsp (32g)", caloriesPerUnit: 190, proteinPerUnit: 8, carbsPerUnit: 7, fatPerUnit: 16 },
-  { keywords: ["milk", "whole milk", "almond milk"], name: "Milk", defaultServing: "1 cup (240ml)", caloriesPerUnit: 120, proteinPerUnit: 8, carbsPerUnit: 12, fatPerUnit: 5 },
-  { keywords: ["coffee", "cold brew", "espresso"], name: "Black Coffee / Cold Brew", defaultServing: "12 oz", caloriesPerUnit: 5, proteinPerUnit: 0, carbsPerUnit: 1, fatPerUnit: 0 },
-  { keywords: ["tuna", "canned tuna"], name: "Canned Tuna in Water", defaultServing: "1 can (140g)", caloriesPerUnit: 130, proteinPerUnit: 30, carbsPerUnit: 0, fatPerUnit: 1 },
-];
 
 /**
  * Check if the text contains direct macro shorthand like:
@@ -94,11 +63,11 @@ export function parseFoodNaturalLanguage(input: string, favorites: (Extras & {gr
   if (!trimmed) {
     return {
       name: "Meal Entry",
-      calories: 200,
-      protein: 15,
-      carbs: 20,
-      fat: 6,
-      confidence: "fallback_estimate",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      confidence: "unmatched",
     };
   }
 
@@ -109,7 +78,7 @@ export function parseFoodNaturalLanguage(input: string, favorites: (Extras & {gr
   // 2. Parse natural language phrases
   // Split by connectors: "and", "with", "+", "&", ","
   const segments = favorites.some(f=>[f.name,f.alias].some(n=>n?.toLowerCase()===trimmed.toLowerCase())) ? [trimmed] : trimmed
-    .split(/\b(?:and|with|\+|&|,)\b/i)
+    .split(/\band\b|\bwith\b|[+&,]/i)
     .map((s) => s.trim())
     .filter(Boolean);
 
@@ -124,8 +93,7 @@ export function parseFoodNaturalLanguage(input: string, favorites: (Extras & {gr
     const amount = /^(\d+(?:\.\d+)?)(?:\s*(oz|g|cups?|tbsp)\b)?\s*/i.exec(seg);
     const name = seg.slice(amount?.[0].length || 0).trim().toLowerCase();
     const saved = favorites.find(f=>[f.name,f.alias].some(n=>n?.toLowerCase()===name));
-    const food = COMMON_FOODS.filter(f=>f.keywords.some(k=>name.includes(k))).sort((a,b)=>
-      Math.max(...b.keywords.filter(k=>name.includes(k)).map(k=>k.length))-Math.max(...a.keywords.filter(k=>name.includes(k)).map(k=>k.length)))[0];
+    const food = COMMON_FOODS.find(f => f.name.toLowerCase() === name || f.keywords.includes(name));
     const found = saved || food;
     if(found) {
       const serving=(saved?.grams && ["g","oz"].includes(amount?.[2]?.toLowerCase()||"") ? saved.grams+" g" : saved?.servingSize) || food?.defaultServing || '';
@@ -147,12 +115,7 @@ export function parseFoodNaturalLanguage(input: string, favorites: (Extras & {gr
       matchedNames.push(found.name);
     }
     if (!found) {
-      detailParts.push({});
-      // Default estimation for unknown segment
-      totalCalories += 150;
-      totalProtein += 10;
-      totalCarbs += 15;
-      totalFat += 5;
+      return {name: trimmed, calories: 0, protein: 0, carbs: 0, fat: 0, confidence: "unmatched"};
     }
   }
 
@@ -166,7 +129,7 @@ export function parseFoodNaturalLanguage(input: string, favorites: (Extras & {gr
     carbs: totalCarbs,
     fat: totalFat,
     ...Object.fromEntries(keys.filter(k=>detailParts.length && detailParts.every(p=>p[k]!=null)).map(k=>[k,detailParts.reduce((n,p)=>n+p[k]!,0)])),
-    confidence: matchedNames.length > 0 ? "parsed_ingredients" : "fallback_estimate",
+    confidence: matchedNames.length > 0 ? "parsed_ingredients" : "unmatched",
     ingredients: matchedNames,
   };
 }

@@ -4,7 +4,7 @@ import type {ModalMacros} from "./types";
 import {scaleExtras} from "./services/nutrients";
 import FoodsScreen from "./screens/FoodsScreen";
 import {saveFavoriteMeal} from "./services/storageService";
-import { Toaster } from "sonner";
+import { toast, Toaster } from "sonner";
 
 import { parseFoodNaturalLanguage } from "./services/foodParserService";
 import { useNutritionState } from "./hooks/useNutritionState";
@@ -113,6 +113,10 @@ export default function App() {
             onClose={() => setShowVoice(false)}
             onVoiceResult={(transcript) => {
               const parsed = parseFoodNaturalLanguage(transcript,getFavoriteMeals());
+              if (parsed.confidence === "unmatched") {
+                toast("Food not recognized. Search the diary or enter its nutrition from the label.");
+                return;
+              }
               const h = new Date().getHours();
               const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
               handleLogEntry({

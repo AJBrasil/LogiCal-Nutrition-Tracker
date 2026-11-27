@@ -1,6 +1,6 @@
 import {ExtraFields} from "./NutritionDetails";
 import {scaleExtras} from "../services/nutrients";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Star } from "lucide-react";
 
 import { isFavoriteMeal, saveFavoriteMeal, getFavoriteMeals, removeFavoriteMeal } from "../services/storageService";
@@ -15,17 +15,21 @@ const PERIOD_LABELS: { key: MealPeriod; label: string; hint: string }[] = [
 
 interface EntryModalProps {
   library?:boolean;
+  manualEntry?:boolean;
   initialData: ModalMacros;
   onClose: () => void;
   onLog: (data: ModalMacros) => void;
 }
 
-export default function EntryModal({ library=false,initialData, onClose, onLog }: EntryModalProps) {
+export default function EntryModal({ manualEntry=false, library=false,initialData, onClose, onLog }: EntryModalProps) {
   const [data, setData] = useState<ModalMacros>(initialData);
+  const [entered, setEntered] = useState<Record<string,boolean>>({});
   const [portions,setPortions]=useState("1");
+  const lastPortions = useRef(1);
   const [isFav, setIsFav] = useState<boolean>(() => isFavoriteMeal(initialData.name));
 
   const updateMacro = (key: "calories" | "protein" | "carbs" | "fat", val: string) => {
+    setEntered(prev => ({...prev, [key]:val.trim() !== ""}));
     const n = Math.max(0,Number(val) || 0);
     setData((prev) => ({ ...prev, [key]: n }));
   };
@@ -33,6 +37,7 @@ export default function EntryModal({ library=false,initialData, onClose, onLog }
   return (
     <div className="absolute inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
+        role="dialog" aria-modal="true" aria-label="Review food entry"
         className="entry-sheet rounded-t-3xl overflow-y-auto animate-in slide-in-from-bottom duration-200"
         style={{ background: "#1A1A22", borderTop: "1px solid rgba(255,255,255,0.1)" }}
         onClick={(e) => e.stopPropagation()}
@@ -42,6 +47,8 @@ export default function EntryModal({ library=false,initialData, onClose, onLog }
         </div>
 
         <div className="px-4 pt-2 pb-6">
+          <h2 className="text-xl font-semibold mb-3">{library ? "Library food" : "Review food entry"}</h2>
+          {manualEntry && <p className="mb-3">Enter the nutrition for your portion before logging this food.</p>}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1">
               <span
@@ -119,24 +126,29 @@ export default function EntryModal({ library=false,initialData, onClose, onLog }
             </div>
           </div>
 
-          <label className="block mb-2">Servings <input aria-label="Servings" type="number" step="any" min="0.01" value={portions} onChange={e=>{
+          <fieldset className="entry-group"><legend>Serving size</legend>
+          <div className="portion-fields">
+          <label>Number of servings <input aria-label="Servings" type="number" step="any" min="0.01" value={portions} onChange={e=>{
             const value=e.target.value;setPortions(value);
-            const n=Number(value);if(n>0) setData(prev=>({...prev,
-              ...scaleExtras(initialData,n), grams:initialData.grams?initialData.grams*n:undefined,
-              calories:Math.round(initialData.calories*n),protein:Math.round(initialData.protein*n*10)/10,
-              carbs:Math.round(initialData.carbs*n*10)/10,fat:Math.round(initialData.fat*n*10)/10,
+            const n=Number(value);
+            if (!Number.isFinite(n) || n <= 0) return;
+            const ratio = n / lastPortions.current;
+            lastPortions.current = n;
+            setData(prev=>({...prev,
+              ...scaleExtras(prev,ratio), grams:prev.grams?prev.grams*ratio:undefined,
+              calories:Math.round(prev.calories*ratio),protein:Math.round(prev.protein*ratio*10)/10,
+              carbs:Math.round(prev.carbs*ratio*10)/10,fat:Math.round(prev.fat*ratio*10)/10,
               servingSize:n===1?initialData.servingSize:(initialData.servingSize || '1 serving').replace(/^(\d+(?:\.\d+)?(?:\/\d+)?)/,q=>{
                 const [a,b='1']=q.split('/');return String(Math.round(Number(a)/Number(b)*n*100)/100);
               })
             }));
           }}/></label>
-          <label>Reference portion <input placeholder="4 oz" value={data.servingSize || ''} onChange={e=>setData({...data,servingSize:e.target.value})}/></label>
+          <label>Portion description <input placeholder="4 oz" value={data.servingSize || ''} onChange={e=>setData({...data,servingSize:e.target.value})}/></label>
           {library && <label>Barcode <input inputMode="numeric" value={data.barcode||""} onChange={e=>setData({...data,barcode:e.target.value.replace(/\D/g,"")})}/></label>}
-          <label>Grams per portion <input type="number" min="0" step="any" value={data.grams??""} onChange={e=>setData({...data,grams:Number(e.target.value)||undefined})}/></label>
-          <details><summary>Nutrition label details</summary><ExtraFields value={data} onChange={next=>setData({...data,...next})}/></details>
+          <label>Total grams <input type="number" min="0" step="any" value={data.grams??""} onChange={e=>setData({...data,grams:Number(e.target.value)||undefined})}/></label>
           {(isFav || library) && <label> Food alias <input placeholder="my usual chicken" value={data.alias || ''} onChange={e=>setData({...data,alias:e.target.value})}/></label>}
-          <div className="h-px bg-border mb-4" />
-
+          </div></fieldset>
+          <fieldset className="entry-group"><legend>Nutrition for this amount</legend>
           <div className="flex items-baseline justify-between mb-3">
             <span
               className="text-[11px] tracking-widest uppercase text-muted-foreground"
@@ -147,7 +159,7 @@ export default function EntryModal({ library=false,initialData, onClose, onLog }
             <div className="rounded-md overflow-hidden" style={{ background: "#252530" }}>
               <input
                 type="number"
-                value={data.calories}
+                aria-label="Calories" placeholder="kcal" value={manualEntry && !entered.calories ? "" : data.calories}
                 onChange={(e) => updateMacro("calories", e.target.value)}
                 className="w-24 text-right text-[22px] font-mono font-medium bg-transparent text-[#00D98A] px-2 py-1 outline-none"
                 style={{ fontFamily: "DM Mono, monospace" }}
@@ -167,7 +179,7 @@ export default function EntryModal({ library=false,initialData, onClose, onLog }
                 <div className="rounded-md overflow-hidden" style={{ background: "#252530" }}>
                   <input
                     type="number"
-                    value={data[key]}
+                    aria-label={key} value={manualEntry && !entered[key] ? "" : data[key]}
                     onChange={(e) => updateMacro(key, e.target.value)}
                     className="w-16 text-right text-[15px] font-mono font-medium bg-transparent text-foreground px-2 py-1.5 outline-none"
                     style={{ fontFamily: "DM Mono, monospace" }}
@@ -180,7 +192,8 @@ export default function EntryModal({ library=false,initialData, onClose, onLog }
             </div>
           ))}
 
-          <div className="h-px bg-border mb-4" />
+          <details><summary>Nutrition label details</summary><ExtraFields value={data} onChange={next=>setData({...data,...next})}/></details>
+          </fieldset>
 
           <div className="flex gap-3">
             <button
@@ -191,7 +204,7 @@ export default function EntryModal({ library=false,initialData, onClose, onLog }
               Cancel
             </button>
             <button
-              disabled={!data.name.trim() || Number(portions)<=0}
+              disabled={(manualEntry && !Object.values(entered).some(Boolean)) || !data.name.trim() || Number(portions)<=0}
               onClick={() => {
                 if(library){onLog(data);return;}
                 if (isFav && data.name.trim()) {

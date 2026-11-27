@@ -3,7 +3,7 @@ import {DiaryDetails} from "../components/NutritionDetails";
 import { change,syncLabel } from "../services/serverSync";
 import {formatDateKey,getEntriesForDate} from "../services/storageService";
 import {toast} from "sonner";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -213,8 +213,38 @@ export default function DashboardScreen({
     time: "morning",
   });
   const [inputVal, setInputVal] = useState(()=>localStorage.getItem("logical.draft") || "");
+  type SearchMatch = Omit<ModalMacros, "time"> & {source:string};
+  const [preview, setPreview] = useState<{query:string; matches:SearchMatch[]; failed:boolean} | null>(null);
+  const pendingEnter = useRef(false);
+  const [manualEntry, setManualEntry] = useState(false);
+  const query = inputVal.trim();
+  useEffect(() => {
+    if (!query || showModal) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      let matches:SearchMatch[] = [];
+      let failed = false;
+      try {
+        const response = await fetch("/api/foods/search?q=" + encodeURIComponent(query), {signal:controller.signal});
+        if (!response.ok) throw Error("Food search unavailable");
+        const data = await response.json();
+        if (!Array.isArray(data)) throw Error("Invalid search response");
+        matches = data;
+      } catch {
+        failed = true;
+      }
+      if (controller.signal.aborted) return;
+      setPreview({query, matches, failed});
+      if (pendingEnter.current) {
+        pendingEnter.current = false;
+        reviewFirstMatch(matches);
+      }
+    }, 220);
+    return () => {clearTimeout(timer); controller.abort();};
+  }, [query, showModal]);
+  const results = preview?.query === query ? preview : null;
   const [editing,setEditing]=useState<FoodEntry|null>(null);
-  const editEntry=(entry:FoodEntry)=>{setEditing(entry);setModalData(entry);setShowModal(true);};
+  const editEntry=(entry:FoodEntry)=>{setManualEntry(false);setEditing(entry);setModalData(entry);setShowModal(true);};
   const prior=new Date(dateKey+"T12:00:00"); prior.setDate(prior.getDate()-1);
   const breakfast=getEntriesForDate(formatDateKey(prior)).filter(e=>e.time==="morning");
   const copyBreakfast=()=>{
@@ -233,6 +263,7 @@ export default function DashboardScreen({
     if (!text.trim()) return; setEditing(null);
 
     const parsed = parseFoodNaturalLanguage(text,getFavoriteMeals());
+    setManualEntry(parsed.confidence === "unmatched");
     const h = new Date().getHours();
     const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
 
@@ -248,9 +279,17 @@ export default function DashboardScreen({
     setShowModal(true);
   };
 
+  function reviewFirstMatch(matches:SearchMatch[]) {
+    if (matches.length) {
+      const {source, ...food} = matches[0];
+      handleQuickSelect(food);
+    } else handleInputSubmit(query);
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      handleInputSubmit(inputVal);
+      if (results) reviewFirstMatch(results.matches);
+      else pendingEnter.current = Boolean(query);
     }
   };
 
@@ -261,7 +300,8 @@ export default function DashboardScreen({
     ...recents.filter((r) => !favorites.some((f) => f.name.toLowerCase() === r.name.toLowerCase())),
   ].slice(0, 8);
 
-  const handleQuickSelect = (item: FoodEntry) => {
+  const handleQuickSelect = (item: Omit<ModalMacros,"time">) => {
+    setManualEntry(false);
     setEditing(null);
     const h = new Date().getHours();
     const period: MealPeriod = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
@@ -454,8 +494,9 @@ export default function DashboardScreen({
       >
         <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: "#1A1A22" }}>
           <input
+            aria-label="Search for food"
             value={inputVal}
-            onChange={(e) => {setInputVal(e.target.value);localStorage.setItem("logical.draft",e.target.value);}}
+            onChange={(e) => {pendingEnter.current=false;setInputVal(e.target.value);localStorage.setItem("logical.draft",e.target.value);}}
             onKeyDown={handleKeyDown}
             placeholder="Type '3 eggs and sourdough toast' or quick-add..."
             className="flex-1 bg-transparent text-foreground text-[13px] outline-none placeholder:text-muted-foreground min-w-0"
@@ -476,12 +517,22 @@ export default function DashboardScreen({
             <Scan size={18} />
           </button>
         </div>
+        {query && !showModal && <div className="food-results" aria-label="Food search results">
+          <p role="status">{!results ? "Searching foods…" : results.failed ? "Database unavailable. You can still enter a meal." :
+            results.matches.length ? "Matching foods" : "No matching food in your database."}</p>
+          {results?.matches.map(({source, ...food}) => <button type="button" key={food.name} onClick={()=>handleQuickSelect(food)}>
+            <span><strong>{food.name}</strong><small>{source} · {food.servingSize || "1 logged portion"}</small></span>
+            <span>{food.calories} kcal</span>
+          </button>)}
+          <button type="button" onClick={()=>{pendingEnter.current=false;handleInputSubmit(query);}}>Review typed entry</button>
+        </div>}
       </div>
 
       <TabBar activeScreen="dashboard" onTabChange={onTabChange} />
 
       {showModal && (
         <EntryModal
+          manualEntry={manualEntry}
           initialData={modalData}
           onClose={() => setShowModal(false)}
           onLog={(item) => {

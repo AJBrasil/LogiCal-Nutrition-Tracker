@@ -25,11 +25,11 @@ test("estimates common foods from natural language", () => {
   assert.deepEqual(result.ingredients, ["Large Egg", "Sourdough Toast"]);
 });
 
-test("uses fallback estimate for unknown foods", () => {
+test("flags unknown foods for manual entry", () => {
   const result = parseFoodNaturalLanguage("mystery leftovers");
 
-  assert.equal(result.confidence, "fallback_estimate");
-  assert.equal(result.calories, 150);
+  assert.equal(result.confidence, "unmatched");
+  assert.equal(result.calories, 0);
 });
 
 test('scales named portions and saved aliases',()=>{

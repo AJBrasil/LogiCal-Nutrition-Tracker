@@ -49,6 +49,12 @@ http
       )
         return json(403, { error: "Use your authorized Tailscale identity" });
       if (url.pathname.startsWith("/api/")) {
+        if (req.method === "GET" && url.pathname === "/api/foods/search") {
+          const start = performance.now();
+          const matches = store.searchFoods(url.searchParams.get("q") || "");
+          console.info("GET /api/foods/search sqlite matches=%d duration_ms=%d", matches.length, Math.round(performance.now()-start));
+          return json(200, matches);
+        }
         if (req.method === "GET" && url.pathname === "/api/state")
           return json(200, snapshot());
         if (

@@ -97,3 +97,18 @@ test("water additions and a corrected daily weigh-in survive replay",()=>{
   assert.throws(()=>store.apply([{id:randomUUID(),changes:[[w1,-100]]}]));
  }finally{store.db.close();}
 });
+
+test("food search reads live SQLite rows, aliases and the reference catalog", () => {
+  const store = openStore(":memory:");
+  try {
+    const food = {id:7, name:"House stew", alias:"usual lunch", calories:410, protein:20, carbs:40, fat:12,time:"afternoon"};
+    const update = changes => store.apply([{id:randomUUID(), changes}]);
+    update([["meal:2026-11-26:7",food],["favorite:7",{...food, calories:420}]]);
+    assert.deepEqual(store.searchFoods(" USUAL ").map(x => [x.name,x.source,x.calories]), [["House stew","Saved food",420]]);
+    update([["favorite:7",null]]);
+    assert.equal(store.searchFoods("stew")[0].source,"Diary");
+    assert.equal(store.searchFoods("ban")[0].name,"Fresh Banana");
+    assert.deepEqual(store.searchFoods("_"),[]);
+    assert.deepEqual(store.searchFoods("no such food"),[]);
+  } finally {store.db.close();}
+});
