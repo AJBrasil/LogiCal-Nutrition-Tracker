@@ -250,6 +250,14 @@ export default function DashboardScreen({
     return () => {clearTimeout(timer); controller.abort();};
   }, [query, showModal]);
   const results = preview?.query === query ? preview : null;
+  const liveResults = products?.query === query ? products : null;
+  const visibleLocal = (results?.matches ?? []).filter(food =>
+    !food.barcode || !liveResults?.matches.some(product => product.barcode === food.barcode));
+  const localGroups = [
+    {title:"Saved foods and diary entries", foods:visibleLocal.filter(f => f.source === "Saved food" || f.source === "Diary")},
+    {title:"USDA everyday foods", foods:visibleLocal.filter(f => f.source === "USDA")},
+    {title:"Cached Open Food Facts products", foods:visibleLocal.filter(f => f.source === "Open Food Facts")},
+  ];
   const [editing,setEditing]=useState<FoodEntry|null>(null);
   const editEntry=(entry:FoodEntry)=>{setManualEntry(false);setEditing(entry);setModalData(entry);setShowModal(true);};
   const prior=new Date(dateKey+"T12:00:00"); prior.setDate(prior.getDate()-1);
@@ -551,19 +559,25 @@ export default function DashboardScreen({
           </button>
         </div>
         {query && !showModal && <div className="food-results" aria-label="Food search results">
-          <p role="status">{!results ? "Searching foods…" : results.failed ? "Database unavailable. You can still enter a meal." :
-            results.matches.length ? "Your foods and everyday foods" : "No local matches."}</p>
-          {results?.matches.filter(food => !food.barcode || !products?.matches.some(p => p.barcode === food.barcode)).map(({source, ...food}) => <button type="button" key={food.fdcId || food.name} onClick={()=>handleQuickSelect(food)}>
-            <span><strong>{food.name}</strong><small>{source} · {food.servings && food.servings !== 1 ? food.servings+" × " : ""}{food.servingSize || "1 logged portion"}</small></span>
-            <span>{food.calories} kcal</span>
-          </button>)}
-          {query.length < 3 && <p>Type at least 3 characters to search Open Food Facts.</p>}
-          {products?.query === query && <><p role="status">{products.message}</p>
-            {products.matches.map((food) => <button type="button" key={food.barcode} onClick={()=>openSearchResult(food)}>
-              <span><strong>{food.name}</strong><small>{food.source} · {food.servingSize || "Packaged product"}</small></span><span>{food.needsLabel ? "View label" : food.calories+" kcal"}</span>
+          {(!results || results.failed || !results.matches.length) && <p role="status">
+            {!results ? "Searching foods…" : results.failed ? "Database unavailable. You can still enter a meal." : "No local matches."}
+          </p>}
+          {localGroups.filter(group => group.foods.length > 0).map(({title,foods}) => <section key={title}>
+            <h3>{title}</h3>
+            {foods.map(({source, ...food}) => <button type="button" key={food.fdcId || food.name} onClick={()=>handleQuickSelect(food)}>
+              <span><strong>{food.name}</strong><small>{source === "Saved food" || source === "Diary" ? source+" · " : ""}{food.servings && food.servings !== 1 ? food.servings+" × " : ""}{food.servingSize || "1 logged portion"}</small></span>
+              <span>{food.calories} kcal</span>
             </button>)}
-            {products.matches.length > 0 && <a href="https://openfoodfacts.org" target="_blank" rel="noreferrer" className="px-3 underline text-xs">Data from Open Food Facts (ODbL)</a>}
-          </>}
+          </section>)}
+          {query.length < 3 && <p>Type at least 3 characters to search Open Food Facts.</p>}
+          {liveResults && liveResults.message !== "Open Food Facts products" && <p role="status">{liveResults.message}</p>}
+          {!!liveResults?.matches.length && <section>
+            <h3>Live Open Food Facts products</h3>
+            {liveResults.matches.map(food => <button type="button" key={food.barcode} onClick={()=>openSearchResult(food)}>
+              <span><strong>{food.name}</strong><small>{food.servingSize || "Packaged product"}</small></span><span>{food.needsLabel ? "View label" : food.calories+" kcal"}</span>
+            </button>)}
+            <a href="https://openfoodfacts.org" target="_blank" rel="noreferrer" className="px-3 underline text-xs">Data from Open Food Facts (ODbL)</a>
+          </section>}
           <button type="button" onClick={()=>handleInputSubmit(query)}>Review typed entry</button>
         </div>}
       </div>
