@@ -1,3 +1,4 @@
+import {keys} from "../services/nutrients";
 import {ExtraFields} from "./NutritionDetails";
 import {forServings,referencePortion} from "../services/portions";
 import { useState } from "react";
@@ -33,9 +34,10 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
   const [isFav, setIsFav] = useState<boolean>(() => isFavoriteMeal(initialData.name));
 
   const updateMacro = (key: "calories" | "protein" | "carbs" | "fat", val: string) => {
+    if (!validCount) return;
     setEntered(prev => ({...prev, [key]:val.trim() !== ""}));
     const n = Math.max(0,Number(val) || 0);
-    setData((prev) => ({ ...prev, [key]: n }));
+    setData((prev) => ({ ...prev, [key]: n / count }));
   };
 
   return (
@@ -52,7 +54,7 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
 
         <div className="px-4 pt-2 pb-6">
           <h2 className="text-xl font-semibold mb-3">{library ? "Library food" : "Review food entry"}</h2>
-          {manualEntry && <p className="mb-3">Enter the nutrition for one serving before logging this food.</p>}
+          {manualEntry && <p className="mb-3">Enter the nutrition for the amount eaten before logging this food.</p>}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1">
               <span
@@ -160,7 +162,8 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
             </div>
           </div>
 
-          <fieldset className="entry-group"><legend>Nutrition per serving</legend>
+          <fieldset className="entry-group" disabled={!validCount}>
+          <legend>{library ? "Nutrition per serving" : validCount ? `Nutrition for ${count} ${count === 1 ? "serving" : "servings"}` : "Nutrition for amount eaten"}</legend>
           <div className="flex items-baseline justify-between mb-3">
             <span
               className="text-[11px] tracking-widest uppercase text-muted-foreground"
@@ -170,8 +173,8 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
             </span>
             <div className="rounded-md overflow-hidden" style={{ background: "#252530" }}>
               <input
-                type="number"
-                aria-label="Calories" placeholder="kcal" value={manualEntry && !entered.calories ? "" : data.calories}
+                type="number" step="any" min="0"
+                aria-label="Calories" placeholder="kcal" value={!validCount || (manualEntry && !entered.calories) ? "" : totals.calories}
                 onChange={(e) => updateMacro("calories", e.target.value)}
                 className="w-24 text-right text-[22px] font-mono font-medium bg-transparent text-[#00D98A] px-2 py-1 outline-none"
                 style={{ fontFamily: "DM Mono, monospace" }}
@@ -190,8 +193,8 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
               <div className="flex items-center gap-2">
                 <div className="rounded-md overflow-hidden" style={{ background: "#252530" }}>
                   <input
-                    type="number"
-                    aria-label={key} value={manualEntry && !entered[key] ? "" : data[key]}
+                    type="number" step="any" min="0"
+                    aria-label={key} value={!validCount || (manualEntry && !entered[key]) ? "" : totals[key]}
                     onChange={(e) => updateMacro(key, e.target.value)}
                     className="w-16 text-right text-[15px] font-mono font-medium bg-transparent text-foreground px-2 py-1.5 outline-none"
                     style={{ fontFamily: "DM Mono, monospace" }}
@@ -204,9 +207,11 @@ export default function EntryModal({ manualEntry=false, library=false,initialDat
             </div>
           ))}
 
-          <details><summary>Nutrition label details</summary><ExtraFields value={data} onChange={next=>setData({...data,...next})}/></details>
+          <details><summary>Nutrition label details</summary><ExtraFields value={validCount ? totals : {}} onChange={next=>{
+            const key = keys.find(k => next[k] !== totals[k]);
+            if (key && validCount) setData(prev => ({...prev,[key]:next[key] == null ? undefined : next[key] / count}));
+          }}/></details>
           </fieldset>
-          {!library && validCount && <p className="mb-4">For {count} {count === 1 ? "serving" : "servings"}: {totals.calories} kcal · {totals.protein} g protein · {totals.carbs} g carbs · {totals.fat} g fat</p>}
 
           <div className="flex gap-3">
             <button

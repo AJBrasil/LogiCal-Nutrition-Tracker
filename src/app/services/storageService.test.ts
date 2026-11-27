@@ -104,3 +104,11 @@ test("a portion with only a volume has unknown mass", () => {
   const base = referencePortion({servingSize:"250 ml",calories:100,protein:5,carbs:10,fat:4});
   assert.equal(forServings(base,2).grams,undefined);
 });
+
+test("fractional per-serving edits preserve the entered total on reopening", () => {
+  const base = referencePortion({calories:160,carbs:26,protein:5,fat:3,fiber:7/1.5});
+  const totals = forServings(base,1.5);
+  assert.equal(totals.calories,240);
+  assert.equal(totals.fiber,7);
+  assert.equal(forServings(referencePortion({...totals,perServing:base}),3).fiber,14);
+});

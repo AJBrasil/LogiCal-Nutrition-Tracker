@@ -1,4 +1,4 @@
-import {scaleExtras, type Extras} from "./nutrients.ts";
+import {keys,scaleExtras, type Extras} from "./nutrients.ts";
 
 export interface ServingNutrition extends Extras {
   calories:number;
@@ -19,7 +19,8 @@ export function referencePortion(food:ServingNutrition & PortionInfo & {servingS
   const label = food.servingSize || "";
   const weight = /(?:^|[\s(])(\d+(?:\.\d+)?)\s*(?:g|grams?)\b/i.exec(label);
   const grams = base.grams ?? (weight ? Number(weight[1]) : undefined);
-  return {calories,protein,carbs,fat,...scaleExtras(base),grams};
+  const extras = Object.fromEntries(keys.filter(key => Number.isFinite(base[key]) && base[key]! >= 0).map(key => [key,base[key]]));
+  return {calories,protein,carbs,fat,...extras,grams};
 }
 
 export function forServings(base:ServingNutrition, count:number):ServingNutrition {
