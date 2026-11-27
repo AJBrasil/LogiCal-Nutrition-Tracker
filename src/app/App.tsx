@@ -51,8 +51,9 @@ export default function App() {
   } = useNutritionState();
 
   return (
-    <div className="logical-app bg-[#070709]">
+    <>
       <Toaster position="top-center" richColors theme="dark" />
+      <div className="logical-app bg-[#070709]">
 
       <aside className="desktop-sidebar"><strong>LogiCal</strong>
         <TabBar sidebar activeScreen={screen} onTabChange={s=>{setShowSettings(false);setScreen(s);}}/>
@@ -140,6 +141,7 @@ export default function App() {
           />
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
